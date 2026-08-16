@@ -1,0 +1,56 @@
+name: Stage proof cost
+on:
+  push:
+    paths:
+      - '.github/workflows/stage-proof-cost.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stage contradiction proof by cost
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('index.html')
+          s=p.read_text()
+
+          # One reusable cost-bounded deduction ladder.
+          marker="function hallTier(src,size){return hallSubsetDeduction(src,'row',size,size)||hallSubsetDeduction(src,'col',size,size)||reverseHallRegionDeduction(src,'row',size,size)||reverseHallRegionDeduction(src,'col',size,size)||null}"
+          extra=marker+"function deductionUpToHall(src,maxHall){let d=cheapDirect(src);if(d)return d;for(let size=2;size<=maxHall;size++){d=hallTier(src,size);if(d)return d}return null}"
+          if marker not in s: raise SystemExit('hallTier marker not found')
+          s=s.replace(marker,extra,1)
+
+          # Deterministic closure accepts a Hall ceiling.
+          old="function deterministicClosure(src){const limit=N*N*20;for(let guard=0;guard<limit;guard++){const bad=contradiction(src);if(bad)return{contradiction:true,reason:bad};const d=direct(src);if(!d)return{contradiction:false};if(d.bad)return{contradiction:true,reason:d.bad};applyToSim(src,d)}return{contradiction:false}}"
+          new="function deterministicClosure(src,maxHall=5){const limit=N*N*20;for(let guard=0;guard<limit;guard++){const bad=contradiction(src);if(bad)return{contradiction:true,reason:bad};const d=deductionUpToHall(src,maxHall);if(!d)return{contradiction:false};if(d.bad)return{contradiction:true,reason:d.bad};applyToSim(src,d)}return{contradiction:false}}"
+          if old not in s: raise SystemExit('deterministicClosure marker not found')
+          s=s.replace(old,new,1)
+
+          # Proof tries cheap propagation for every assumption first, then Hall 2-3, then Hall 4-5.
+          start=s.index('function proofDeduction(src=cells)')
+          end=s.index('function cheapDirect(',start)
+          new_proof="""function proofDeduction(src=cells){const snap=solverSnapshot(src),cand=src.flat().filter(c=>isCandidate(c,src));cand.sort((a,b)=>{const sa=snap.rowCandidates[a.row]+snap.colCandidates[a.col]+snap.regionCandidates[a.regionId],sb=snap.rowCandidates[b.row]+snap.colCandidates[b.col]+snap.regionCandidates[b.regionId];return sa-sb});const stages=[{maxHall:0,label:'基本反證'},{maxHall:3,label:'Hall 2~3 反證'},{maxHall:5,label:'Hall 4~5 反證'}];for(const stage of stages){for(const assumedState of[2,1]){for(const c of cand){const sim=cloneState(src);sim[c.row][c.col].state=assumedState;touchState(sim);const r=deterministicClosure(sim,stage.maxHall);if(!r.contradiction)continue;if(assumedState===2)return{label:stage.label+'：假設 R'+(c.row+1)+'C'+(c.col+1)+' 是皇后會造成「'+r.reason+'」，因此必為 X',changes:[{row:c.row,col:c.col,newState:1}]};return{label:stage.label+'：假設 R'+(c.row+1)+'C'+(c.col+1)+' 是 X 會造成「'+r.reason+'」，因此必為皇后',changes:[{row:c.row,col:c.col,newState:2}]}}}}return null}"
+          s=s[:start]+new_proof+s[end:]
+
+          p.write_text(s)
+          PY
+      - name: Syntax check
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          s=Path('index.html').read_text()
+          Path('/tmp/check.js').write_text(re.search(r'<script>(.*)</script>',s,re.S).group(1))
+          PY
+          node --check /tmp/check.js
+      - name: Commit changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git diff --cached --quiet || git commit -m 'perf: stage contradiction proof by inference cost'
+          git push
