@@ -33,8 +33,13 @@ jobs:
         run: npm run build
       - name: Copy favicon into Pages artifact
         run: cp favicon.svg dist/favicon.svg
-      - name: Copy DEV route into Pages artifact
-        run: cp -R dev dist/dev
+      - name: Promote validated DEV UI to production and DEV routes
+        run: |
+          cp dist/index.html dist/base.html
+          cp -R dev dist/dev
+          sed -i "s#fetch('../index.html'#fetch('../base.html'#" dist/dev/index.html
+          cp dist/dev/index.html dist/index.html
+          sed -i "s#fetch('../base.html'#fetch('base.html'#" dist/index.html
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload Pages artifact
