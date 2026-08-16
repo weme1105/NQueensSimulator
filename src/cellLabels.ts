@@ -58,7 +58,6 @@ export function installCellLabels(app: LabelBridge): void {
       element.querySelector('.region-number')?.remove();
       element.querySelector('.cell-coordinate')?.remove();
 
-      // Labels are intended as solving aids. X and queens remain visually clean.
       if (!app.isPlayMode() || cell.state !== 0 || cell.regionId < 0) continue;
 
       const region = document.createElement('span');
@@ -67,7 +66,7 @@ export function installCellLabels(app: LabelBridge): void {
 
       const coordinate = document.createElement('span');
       coordinate.className = 'cell-coordinate';
-      coordinate.textContent = `C${col + 1}R${row + 1}`;
+      coordinate.textContent = `(${col + 1},${row + 1})`;
 
       element.append(region, coordinate);
     }
