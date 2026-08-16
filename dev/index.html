@@ -20,217 +20,56 @@
     body.nq-dev-ready .toolbar #clear,
     body.nq-dev-ready .toolbar .stats { display:none!important; }
     body.nq-dev-ready #mode { display:none!important; }
-
     .dev-edit-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin:0 0 10px; }
     .dev-edit-actions .region-color-tools { margin:0; width:auto; }
     .dev-edit-actions .region-color-panel { width:100%; flex-basis:100%; }
     .dev-clear-board { font-weight:700; }
-
     .dev-play-actions { display:none; gap:8px; flex-wrap:wrap; align-items:center; margin:8px 0 8px; }
     body.nq-play-mode .dev-play-actions { display:flex; }
     body.nq-play-mode .dev-edit-actions,
     body.nq-play-mode #palette,
-    body.nq-play-mode .region-color-tools { display:none!important; }
-
+    body.nq-play-mode .region-color-tools,
+    body.nq-play-mode .region-legend { display:none!important; }
     .dev-rule-tip { display:none; margin:0; }
     body.nq-play-mode .dev-rule-tip { display:inline-flex; }
     body.nq-play-mode .play-guide:not(.dev-open) { display:none!important; }
     body.nq-play-mode .play-guide.dev-open { display:grid!important; width:100%; margin-top:0; }
-
-    .dev-play-actions #stepSolve,
-    .dev-play-actions #autoQueen { margin:0!important; }
-    .dev-play-actions:not(.solver-unlocked) #stepSolve,
-    .dev-play-actions:not(.solver-unlocked) #autoQueen { display:none!important; }
-    .dev-play-actions.solver-unlocked #stepSolve,
-    .dev-play-actions.solver-unlocked #autoQueen { display:inline-block!important; }
-
-    body.nq-play-mode .toolbar > span:first-child,
-    body.nq-play-mode .toolbar #n,
-    body.nq-play-mode .toolbar #new { display:none!important; }
+    .dev-play-actions #stepSolve,.dev-play-actions #autoQueen { margin:0!important; }
+    .dev-play-actions:not(.solver-unlocked) #stepSolve,.dev-play-actions:not(.solver-unlocked) #autoQueen { display:none!important; }
+    .dev-play-actions.solver-unlocked #stepSolve,.dev-play-actions.solver-unlocked #autoQueen { display:inline-block!important; }
+    body.nq-play-mode .toolbar > span:first-child,body.nq-play-mode .toolbar #n,body.nq-play-mode .toolbar #new { display:none!important; }
     body.nq-play-mode .toolbar #play { margin-right:auto; }
-
     body:not(.nq-play-mode) .annotation-tools { display:none!important; }
-
-    @media(max-width:850px){
-      .dev-edit-actions,.dev-play-actions{gap:6px}
-    }
+    @media(max-width:850px){.dev-edit-actions,.dev-play-actions{gap:6px}}
   </style>`;
 
   const patchScript = `
   <scr` + `ipt>
   (() => {
-    const ready = (fn) => {
-      const tick = () => {
-        if (window.nqApp && document.querySelector('.annotation-tools') && document.querySelector('.region-color-tools')) fn();
-        else setTimeout(tick, 40);
-      };
-      tick();
-    };
-
+    const ready = (fn) => { const tick=()=>{ if(window.nqApp&&document.querySelector('.annotation-tools')&&document.querySelector('.region-color-tools')) fn(); else setTimeout(tick,40); }; tick(); };
     ready(() => {
-      if (document.body.classList.contains('nq-dev-ready')) return;
+      if(document.body.classList.contains('nq-dev-ready')) return;
       document.body.classList.add('nq-dev-ready');
-
-      const app = window.nqApp;
-      const toolbar = document.querySelector('.toolbar');
-      const mainPanel = document.querySelector('.main .panel');
-      const board = document.querySelector('#board');
-      const history = document.querySelector('#history');
-      const newBtn = document.querySelector('#new');
-      const randomBtn = document.querySelector('#random');
-      const editBtn = document.querySelector('#edit');
-      const playBtn = document.querySelector('#play');
-      const undoBtn = document.querySelector('#undo');
-      const clearBtn = document.querySelector('#clear');
-      const solver = document.querySelector('#solver');
-      const stepBtn = document.querySelector('#stepSolve');
-      const autoBtn = document.querySelector('#autoQueen');
-      const colorTools = document.querySelector('.region-color-tools');
-      const guide = document.querySelector('.play-guide');
-      const annotationTools = document.querySelector('.annotation-tools');
-      const palette = document.querySelector('#palette');
-
-      if (!toolbar || !mainPanel || !board || !history || !newBtn || !randomBtn || !editBtn || !playBtn || !undoBtn || !clearBtn || !solver || !stepBtn || !autoBtn || !colorTools || !annotationTools || !palette) return;
-
-      newBtn.textContent = '設定棋盤大小';
-      playBtn.textContent = '開始推演';
-      randomBtn.textContent = '產生隨機棋盤';
-      undoBtn.textContent = '上一步';
-      clearBtn.textContent = '清空';
-      stepBtn.textContent = '推演一步';
-      autoBtn.textContent = '推演到下一個皇后';
-
-      const editActions = document.createElement('div');
-      editActions.className = 'dev-edit-actions';
-      mainPanel.insertBefore(editActions, palette);
-      editActions.appendChild(randomBtn);
-
-      const clearBoard = document.createElement('button');
-      clearBoard.type = 'button';
-      clearBoard.className = 'dev-clear-board';
-      clearBoard.textContent = '清空棋盤';
-      clearBoard.addEventListener('click', () => {
-        if (app.isPlayMode()) editBtn.click();
-        const snapshot = app.getBoard();
-        app.installBoard({
-          size: snapshot.size,
-          cells: snapshot.cells.map(cell => ({ ...cell, regionId: -1, state: 0 }))
-        });
-        requestAnimationFrame(syncMode);
-      });
-      editActions.appendChild(clearBoard);
-      editActions.appendChild(colorTools);
-      const colorToggle = colorTools.querySelector('.region-color-toggle');
-      if (colorToggle) colorToggle.textContent = '🎨 設定色塊顏色';
-
-      const playActions = document.createElement('div');
-      playActions.className = 'dev-play-actions';
-      annotationTools.insertAdjacentElement('afterend', playActions);
-
-      const tipsBtn = document.createElement('button');
-      tipsBtn.type = 'button';
-      tipsBtn.className = 'dev-rule-tip';
-      tipsBtn.textContent = '💡 規則 Tips';
-      playActions.append(tipsBtn, undoBtn, clearBtn, stepBtn, autoBtn);
-      if (guide) {
-        playActions.insertAdjacentElement('afterend', guide);
-        guide.classList.remove('dev-open');
-        tipsBtn.addEventListener('click', () => guide.classList.toggle('dev-open'));
-      }
-
-      const syncUnlock = () => {
-        playActions.classList.toggle('solver-unlocked', solver.style.display === 'block');
-      };
-      new MutationObserver(syncUnlock).observe(solver, { attributes:true, attributeFilter:['style'] });
-      newBtn.addEventListener('click', () => requestAnimationFrame(syncUnlock));
-      syncUnlock();
-
-      const syncMode = () => {
-        const play = !!app.isPlayMode();
-        document.body.classList.toggle('nq-play-mode', play);
-        playBtn.textContent = play ? '離開推演模式' : '開始推演';
-        if (!play && guide) guide.classList.remove('dev-open');
-      };
-
-      playBtn.addEventListener('click', (event) => {
-        if (!app.isPlayMode()) return;
-        event.preventDefault();
-        event.stopImmediatePropagation();
-        editBtn.click();
-        requestAnimationFrame(syncMode);
-      }, true);
-
-      // DEV history: record the actual cells cleared by an X-erasing drag.
-      // Coordinates are displayed as (X,Y) = (column,row), both 1-based.
-      let eraseDrag = null;
-      const cellAtPoint = (clientX, clientY) => {
-        const element = document.elementFromPoint(clientX, clientY);
-        const cell = element && element.closest ? element.closest('.cell') : null;
-        if (!cell || !board.contains(cell)) return null;
-        return { row:Number(cell.dataset.row), col:Number(cell.dataset.col) };
-      };
-      const boardCellState = (position) => {
-        const snapshot = app.getBoard();
-        const cell = snapshot.cells.find(item => item.row === position.row && item.col === position.col);
-        return cell ? cell.state : -1;
-      };
-      const addEraseCoordinate = (position) => {
-        if (!eraseDrag || !position) return;
-        const key = position.col + ',' + position.row;
-        if (eraseDrag.seen.has(key)) return;
-        if (boardCellState(position) !== 1) return;
-        eraseDrag.seen.add(key);
-        eraseDrag.coords.push([position.col + 1, position.row + 1]);
-      };
-      board.addEventListener('pointerdown', (event) => {
-        if (!app.isPlayMode()) return;
-        const start = cellAtPoint(event.clientX, event.clientY);
-        if (!start || boardCellState(start) !== 1) { eraseDrag = null; return; }
-        eraseDrag = { start, moved:false, seen:new Set(), coords:[] };
-      }, true);
-      board.addEventListener('pointermove', (event) => {
-        if (!eraseDrag || !app.isPlayMode()) return;
-        const hit = cellAtPoint(event.clientX, event.clientY);
-        if (!hit) return;
-        if (hit.row !== eraseDrag.start.row || hit.col !== eraseDrag.start.col) {
-          if (!eraseDrag.moved) {
-            eraseDrag.moved = true;
-            addEraseCoordinate(eraseDrag.start);
-          }
-          addEraseCoordinate(hit);
-        }
-      }, true);
-      const finishEraseDrag = () => {
-        const completed = eraseDrag;
-        eraseDrag = null;
-        if (!completed || !completed.moved || !completed.coords.length) return;
-        const label = '拖曳清除 X：[' + completed.coords.map(([x,y]) => '(' + x + ',' + y + ')').join(',') + ']';
-        requestAnimationFrame(() => {
-          const items = Array.from(history.querySelectorAll('.item'));
-          const target = items.find(item => (item.textContent || '').trim().startsWith('拖曳清除 X：'));
-          if (target) target.textContent = label;
-        });
-      };
-      board.addEventListener('pointerup', finishEraseDrag, true);
-      board.addEventListener('pointercancel', finishEraseDrag, true);
-
-      editBtn.addEventListener('click', () => requestAnimationFrame(syncMode));
-      newBtn.addEventListener('click', () => requestAnimationFrame(syncMode));
-      randomBtn.addEventListener('click', () => requestAnimationFrame(syncMode));
-      new MutationObserver(() => requestAnimationFrame(syncMode)).observe(board, { childList:true, subtree:false });
-      syncMode();
+      const app=window.nqApp, toolbar=document.querySelector('.toolbar'), mainPanel=document.querySelector('.main .panel'), board=document.querySelector('#board'), history=document.querySelector('#history'), newBtn=document.querySelector('#new'), randomBtn=document.querySelector('#random'), editBtn=document.querySelector('#edit'), playBtn=document.querySelector('#play'), undoBtn=document.querySelector('#undo'), clearBtn=document.querySelector('#clear'), solver=document.querySelector('#solver'), stepBtn=document.querySelector('#stepSolve'), autoBtn=document.querySelector('#autoQueen'), colorTools=document.querySelector('.region-color-tools'), guide=document.querySelector('.play-guide'), annotationTools=document.querySelector('.annotation-tools'), palette=document.querySelector('#palette');
+      if(!toolbar||!mainPanel||!board||!history||!newBtn||!randomBtn||!editBtn||!playBtn||!undoBtn||!clearBtn||!solver||!stepBtn||!autoBtn||!colorTools||!annotationTools||!palette) return;
+      newBtn.textContent='設定棋盤大小'; playBtn.textContent='開始推演'; randomBtn.textContent='產生隨機棋盤'; undoBtn.textContent='上一步'; clearBtn.textContent='清空'; stepBtn.textContent='推演一步'; autoBtn.textContent='推演到下一個皇后';
+      const editActions=document.createElement('div'); editActions.className='dev-edit-actions'; mainPanel.insertBefore(editActions,palette); editActions.appendChild(randomBtn);
+      const clearBoard=document.createElement('button'); clearBoard.type='button'; clearBoard.className='dev-clear-board'; clearBoard.textContent='清空棋盤'; clearBoard.addEventListener('click',()=>{ if(app.isPlayMode()) editBtn.click(); const snapshot=app.getBoard(); app.installBoard({size:snapshot.size,cells:snapshot.cells.map(cell=>({...cell,regionId:-1,state:0}))}); requestAnimationFrame(syncMode); }); editActions.appendChild(clearBoard); editActions.appendChild(colorTools); const colorToggle=colorTools.querySelector('.region-color-toggle'); if(colorToggle) colorToggle.textContent='🎨 設定色塊顏色';
+      const playActions=document.createElement('div'); playActions.className='dev-play-actions'; annotationTools.insertAdjacentElement('afterend',playActions);
+      const tipsBtn=document.createElement('button'); tipsBtn.type='button'; tipsBtn.className='dev-rule-tip'; tipsBtn.textContent='💡 規則 Tips'; playActions.append(tipsBtn,undoBtn,clearBtn,stepBtn,autoBtn); if(guide){playActions.insertAdjacentElement('afterend',guide); guide.classList.remove('dev-open'); tipsBtn.addEventListener('click',()=>guide.classList.toggle('dev-open'));}
+      const syncUnlock=()=>playActions.classList.toggle('solver-unlocked',solver.style.display==='block'); new MutationObserver(syncUnlock).observe(solver,{attributes:true,attributeFilter:['style']}); newBtn.addEventListener('click',()=>requestAnimationFrame(syncUnlock)); syncUnlock();
+      const syncMode=()=>{const play=!!app.isPlayMode(); document.body.classList.toggle('nq-play-mode',play); playBtn.textContent=play?'離開推演模式':'開始推演'; if(!play&&guide) guide.classList.remove('dev-open');};
+      playBtn.addEventListener('click',(event)=>{if(!app.isPlayMode())return; event.preventDefault();event.stopImmediatePropagation();editBtn.click();requestAnimationFrame(syncMode);},true);
+      let eraseDrag=null; const cellAtPoint=(x,y)=>{const element=document.elementFromPoint(x,y),cell=element&&element.closest?element.closest('.cell'):null;if(!cell||!board.contains(cell))return null;return{row:Number(cell.dataset.row),col:Number(cell.dataset.col)}}; const boardCellState=(p)=>{const cell=app.getBoard().cells.find(i=>i.row===p.row&&i.col===p.col);return cell?cell.state:-1}; const addEraseCoordinate=(p)=>{if(!eraseDrag||!p)return;const key=p.col+','+p.row;if(eraseDrag.seen.has(key)||boardCellState(p)!==1)return;eraseDrag.seen.add(key);eraseDrag.coords.push([p.col+1,p.row+1]);};
+      board.addEventListener('pointerdown',(e)=>{if(!app.isPlayMode())return;const start=cellAtPoint(e.clientX,e.clientY);if(!start||boardCellState(start)!==1){eraseDrag=null;return;}eraseDrag={start,moved:false,seen:new Set(),coords:[]};},true);
+      board.addEventListener('pointermove',(e)=>{if(!eraseDrag||!app.isPlayMode())return;const hit=cellAtPoint(e.clientX,e.clientY);if(!hit)return;if(hit.row!==eraseDrag.start.row||hit.col!==eraseDrag.start.col){if(!eraseDrag.moved){eraseDrag.moved=true;addEraseCoordinate(eraseDrag.start);}addEraseCoordinate(hit);}},true);
+      const finishEraseDrag=()=>{const completed=eraseDrag;eraseDrag=null;if(!completed||!completed.moved||!completed.coords.length)return;const label='拖曳清除 X：['+completed.coords.map(([x,y])=>'('+x+','+y+')').join(',')+']';requestAnimationFrame(()=>{const target=Array.from(history.querySelectorAll('.item')).find(item=>(item.textContent||'').trim().startsWith('拖曳清除 X：'));if(target)target.textContent=label;});}; board.addEventListener('pointerup',finishEraseDrag,true);board.addEventListener('pointercancel',finishEraseDrag,true);
+      editBtn.addEventListener('click',()=>requestAnimationFrame(syncMode));newBtn.addEventListener('click',()=>requestAnimationFrame(syncMode));randomBtn.addEventListener('click',()=>requestAnimationFrame(syncMode));new MutationObserver(()=>requestAnimationFrame(syncMode)).observe(board,{childList:true,subtree:false});syncMode();
     });
   })();
   </scr` + `ipt>`;
-
-  html = html.replace('<head>', '<head><base href="../">').replace('</head>', devStyle + '</head>');
-  html = html.replace('</body>', patchScript + '</body>');
-  document.open();
-  document.write(html);
-  document.close();
-})().catch(error => {
-  document.body.innerHTML = '<pre style="padding:24px">DEV 載入失敗：' + String(error) + '</pre>';
-});
+  html=html.replace('<head>','<head><base href="../">').replace('</head>',devStyle+'</head>'); html=html.replace('</body>',patchScript+'</body>'); document.open();document.write(html);document.close();
+})().catch(error=>{document.body.innerHTML='<pre style="padding:24px">DEV 載入失敗：'+String(error)+'</pre>';});
 </script>
 </body>
 </html>
