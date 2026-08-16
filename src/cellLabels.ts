@@ -36,10 +36,10 @@ export function installCellLabels(app: LabelBridge): void {
       font-weight: 600;
       opacity: .9;
     }
-    .cell.region-edge-top { border-top: 4px solid #111 !important; }
-    .cell.region-edge-right { border-right: 4px solid #111 !important; }
-    .cell.region-edge-bottom { border-bottom: 4px solid #111 !important; }
-    .cell.region-edge-left { border-left: 4px solid #111 !important; }
+    .cell.region-edge-top { border-top: 4px solid #c9c1bd !important; }
+    .cell.region-edge-right { border-right: 4px solid #c9c1bd !important; }
+    .cell.region-edge-bottom { border-bottom: 4px solid #c9c1bd !important; }
+    .cell.region-edge-left { border-left: 4px solid #c9c1bd !important; }
     @media (max-width: 850px) {
       .cell .region-number { font-size: clamp(9px, 3.4vw, 17px); }
       .cell .cell-coordinate { bottom: 3px; font-size: clamp(6px, 2.15vw, 10px); }
