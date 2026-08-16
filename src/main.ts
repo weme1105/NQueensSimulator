@@ -3,6 +3,7 @@ import { installCellLabels } from './cellLabels';
 import { installCoordinateDisplayNormalization } from './coordinateDisplay';
 import { installPlayGuide } from './playGuide';
 import { installRegionColors } from './regionColors';
+import { installSolverButtonLayout } from './solverButtonLayout';
 import { SolverWorkerClient } from './solver/workerClient';
 import type { BoardSnapshot, DeductionResult } from './solver/types';
 
@@ -34,6 +35,7 @@ installPlayGuide(app);
 installAnnotationCanvas(app);
 installCoordinateDisplayNormalization();
 installRegionColors(app);
+installSolverButtonLayout();
 
 const worker = new SolverWorkerClient();
 const stepButton = document.querySelector<HTMLButtonElement>('#stepSolve');
