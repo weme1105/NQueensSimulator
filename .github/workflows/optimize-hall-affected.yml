@@ -1,0 +1,44 @@
+name: Optimize Hall affected scan
+on:
+  push:
+    paths:
+      - '.github/workflows/optimize-hall-affected.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Scan only implicated units for Hall exclusions
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text()
+          old="const affected=src.flat().filter(c=>candidate(c)&&regions.has(c.regionId)&&!unitSet.has(kind==='row'?c.row:c.col));"
+          new="const affected=[];for(const region of regions)for(const c of unitCells(src,'region',region))if(candidate(c)&&!unitSet.has(kind==='row'?c.row:c.col))affected.push(c);"
+          if old not in s: raise SystemExit('forward Hall affected marker not found')
+          s=s.replace(old,new,1)
+          old2="const affected=src.flat().filter(c=>candidate(c)&&units.has(kind==='row'?c.row:c.col)&&!regionSet.has(c.regionId));"
+          new2="const affected=[];for(const unit of units)for(const c of unitCells(src,kind,unit))if(candidate(c)&&!regionSet.has(c.regionId))affected.push(c);"
+          if old2 not in s: raise SystemExit('reverse Hall affected marker not found')
+          s=s.replace(old2,new2,1)
+          p.write_text(s)
+          PY
+      - name: Syntax check
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          s=Path('index.html').read_text()
+          Path('/tmp/check.js').write_text(re.search(r'<script>(.*)</script>',s,re.S).group(1))
+          PY
+          node --check /tmp/check.js
+      - name: Commit changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git diff --cached --quiet || git commit -m 'perf: scan only implicated units for Hall exclusions'
+          git push
