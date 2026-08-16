@@ -1,0 +1,40 @@
+name: Reduce DFS allocations
+on:
+  push:
+    paths:
+      - '.github/workflows/reduce-dfs-allocations.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reduce candidate allocations in uniqueness DFS
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text()
+          old="function candidatesForRow(r){const out=[];for(const c of src[r])if(validCell(c))out.push(c);return out}function hasForwardSupport(){let coverCols=usedColsMask,coverRegions=usedRegionsMask;for(let r=0;r<N;r++){if(assigned[r])continue;let rowOk=false;for(const c of src[r])if(validCell(c)){rowOk=true;coverCols|=1<<c.col;coverRegions|=1<<c.regionId}if(!rowOk)return false}const fullMask=(1<<N)-1;return(coverCols&fullMask)===fullMask&&(coverRegions&fullMask)===fullMask}function dfs(depth){if(count>=limit)return;if(depth===N){count++;if(!firstSolution)firstSolution=Array.from({length:N},(_,r)=>({row:r,col:placedCols[r]}));return}let bestRow=-1,bestCand=null;for(let r=0;r<N;r++){if(assigned[r])continue;const cand=candidatesForRow(r);if(!cand.length)return;if(bestCand===null||cand.length<bestCand.length){bestRow=r;bestCand=cand;if(cand.length===1)break}}for(const c of bestCand){"
+          new="function candidateCountForRow(r){let n=0;for(const c of src[r])if(validCell(c))n++;return n}function candidatesForRow(r){const out=[];for(const c of src[r])if(validCell(c))out.push(c);return out}function hasForwardSupport(){let coverCols=usedColsMask,coverRegions=usedRegionsMask;for(let r=0;r<N;r++){if(assigned[r])continue;let rowOk=false;for(const c of src[r])if(validCell(c)){rowOk=true;coverCols|=1<<c.col;coverRegions|=1<<c.regionId}if(!rowOk)return false}const fullMask=(1<<N)-1;return(coverCols&fullMask)===fullMask&&(coverRegions&fullMask)===fullMask}function dfs(depth){if(count>=limit)return;if(depth===N){count++;if(!firstSolution)firstSolution=Array.from({length:N},(_,r)=>({row:r,col:placedCols[r]}));return}let bestRow=-1,bestCount=N+1;for(let r=0;r<N;r++){if(assigned[r])continue;const n=candidateCountForRow(r);if(!n)return;if(n<bestCount){bestRow=r;bestCount=n;if(n===1)break}}const bestCand=candidatesForRow(bestRow);for(const c of bestCand){"
+          if old not in s: raise SystemExit('DFS candidate allocation marker not found')
+          s=s.replace(old,new,1)
+          p.write_text(s)
+          PY
+      - name: Syntax check
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          s=Path('index.html').read_text()
+          Path('/tmp/check.js').write_text(re.search(r'<script>(.*)</script>',s,re.S).group(1))
+          PY
+          node --check /tmp/check.js
+      - name: Commit changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git diff --cached --quiet || git commit -m 'perf: reduce allocations in uniqueness search'
+          git push
