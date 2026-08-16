@@ -26,7 +26,7 @@
     .dev-edit-actions .region-color-panel { width:100%; flex-basis:100%; }
     .dev-clear-board { font-weight:700; }
 
-    .dev-play-actions { display:none; gap:8px; flex-wrap:wrap; align-items:center; margin:8px 0 10px; }
+    .dev-play-actions { display:none; gap:8px; flex-wrap:wrap; align-items:center; margin:8px 0 8px; }
     body.nq-play-mode .dev-play-actions { display:flex; }
     body.nq-play-mode .dev-edit-actions,
     body.nq-play-mode #palette,
@@ -74,6 +74,8 @@
       const app = window.nqApp;
       const toolbar = document.querySelector('.toolbar');
       const mainPanel = document.querySelector('.main .panel');
+      const board = document.querySelector('#board');
+      const history = document.querySelector('#history');
       const newBtn = document.querySelector('#new');
       const randomBtn = document.querySelector('#random');
       const editBtn = document.querySelector('#edit');
@@ -88,7 +90,7 @@
       const annotationTools = document.querySelector('.annotation-tools');
       const palette = document.querySelector('#palette');
 
-      if (!toolbar || !mainPanel || !newBtn || !randomBtn || !editBtn || !playBtn || !undoBtn || !clearBtn || !solver || !stepBtn || !autoBtn || !colorTools || !annotationTools || !palette) return;
+      if (!toolbar || !mainPanel || !board || !history || !newBtn || !randomBtn || !editBtn || !playBtn || !undoBtn || !clearBtn || !solver || !stepBtn || !autoBtn || !colorTools || !annotationTools || !palette) return;
 
       newBtn.textContent = '設定棋盤大小';
       playBtn.textContent = '開始推演';
@@ -121,20 +123,21 @@
       const colorToggle = colorTools.querySelector('.region-color-toggle');
       if (colorToggle) colorToggle.textContent = '🎨 設定色塊顏色';
 
-      const tipsBtn = document.createElement('button');
-      tipsBtn.type = 'button';
-      tipsBtn.className = 'dev-rule-tip';
-      tipsBtn.textContent = '💡 規則 Tips';
-      if (guide) {
-        guide.insertAdjacentElement('beforebegin', tipsBtn);
-        guide.classList.remove('dev-open');
-        tipsBtn.addEventListener('click', () => guide.classList.toggle('dev-open'));
-      }
-
       const playActions = document.createElement('div');
       playActions.className = 'dev-play-actions';
       annotationTools.insertAdjacentElement('afterend', playActions);
       playActions.append(undoBtn, clearBtn, stepBtn, autoBtn);
+
+      const tipsBtn = document.createElement('button');
+      tipsBtn.type = 'button';
+      tipsBtn.className = 'dev-rule-tip';
+      tipsBtn.textContent = '💡 規則 Tips';
+      playActions.insertAdjacentElement('afterend', tipsBtn);
+      if (guide) {
+        tipsBtn.insertAdjacentElement('afterend', guide);
+        guide.classList.remove('dev-open');
+        tipsBtn.addEventListener('click', () => guide.classList.toggle('dev-open'));
+      }
 
       const syncUnlock = () => {
         playActions.classList.toggle('solver-unlocked', solver.style.display === 'block');
@@ -158,10 +161,64 @@
         requestAnimationFrame(syncMode);
       }, true);
 
+      // DEV history: record the actual cells cleared by an X-erasing drag.
+      // Coordinates are displayed as (X,Y) = (column,row), both 1-based.
+      let eraseDrag = null;
+      const cellAtPoint = (clientX, clientY) => {
+        const element = document.elementFromPoint(clientX, clientY);
+        const cell = element && element.closest ? element.closest('.cell') : null;
+        if (!cell || !board.contains(cell)) return null;
+        return { row:Number(cell.dataset.row), col:Number(cell.dataset.col) };
+      };
+      const boardCellState = (position) => {
+        const snapshot = app.getBoard();
+        const cell = snapshot.cells.find(item => item.row === position.row && item.col === position.col);
+        return cell ? cell.state : -1;
+      };
+      const addEraseCoordinate = (position) => {
+        if (!eraseDrag || !position) return;
+        const key = position.col + ',' + position.row;
+        if (eraseDrag.seen.has(key)) return;
+        if (boardCellState(position) !== 1) return;
+        eraseDrag.seen.add(key);
+        eraseDrag.coords.push([position.col + 1, position.row + 1]);
+      };
+      board.addEventListener('pointerdown', (event) => {
+        if (!app.isPlayMode()) return;
+        const start = cellAtPoint(event.clientX, event.clientY);
+        if (!start || boardCellState(start) !== 1) { eraseDrag = null; return; }
+        eraseDrag = { start, moved:false, seen:new Set(), coords:[] };
+      }, true);
+      board.addEventListener('pointermove', (event) => {
+        if (!eraseDrag || !app.isPlayMode()) return;
+        const hit = cellAtPoint(event.clientX, event.clientY);
+        if (!hit) return;
+        if (hit.row !== eraseDrag.start.row || hit.col !== eraseDrag.start.col) {
+          if (!eraseDrag.moved) {
+            eraseDrag.moved = true;
+            addEraseCoordinate(eraseDrag.start);
+          }
+          addEraseCoordinate(hit);
+        }
+      }, true);
+      const finishEraseDrag = () => {
+        const completed = eraseDrag;
+        eraseDrag = null;
+        if (!completed || !completed.moved || !completed.coords.length) return;
+        const label = '拖曳清除 X：[' + completed.coords.map(([x,y]) => '(' + x + ',' + y + ')').join(',') + ']';
+        requestAnimationFrame(() => {
+          const items = Array.from(history.querySelectorAll('.item'));
+          const target = items.find(item => (item.textContent || '').trim().startsWith('拖曳清除 X：'));
+          if (target) target.textContent = label;
+        });
+      };
+      board.addEventListener('pointerup', finishEraseDrag, true);
+      board.addEventListener('pointercancel', finishEraseDrag, true);
+
       editBtn.addEventListener('click', () => requestAnimationFrame(syncMode));
       newBtn.addEventListener('click', () => requestAnimationFrame(syncMode));
       randomBtn.addEventListener('click', () => requestAnimationFrame(syncMode));
-      new MutationObserver(() => requestAnimationFrame(syncMode)).observe(document.querySelector('#board'), { childList:true, subtree:false });
+      new MutationObserver(() => requestAnimationFrame(syncMode)).observe(board, { childList:true, subtree:false });
       syncMode();
     });
   })();
