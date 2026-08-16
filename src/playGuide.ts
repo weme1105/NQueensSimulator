@@ -34,6 +34,7 @@ export function installPlayGuide(app: GuideBridge): void {
     .mini-cell{width:18px;height:18px;border:1px solid #d9ceca;border-radius:3px;display:flex;align-items:center;justify-content:center;background:#fff;font-size:11px;line-height:1;color:#d9534f;font-weight:800}
     .mini-cell.queen{color:#222;background:#fff7d6}
     .mini-around{display:grid;grid-template-columns:repeat(3,18px);gap:2px;flex:none}
+    body.nq-play-mode #mode{display:none}
     @media(max-width:850px){
       .region-legend{gap:6px}.region-legend-item{width:43px}.region-swatch{height:38px;font-size:15px}
       .rule-row{grid-template-columns:1fr}.rule-item{padding:7px}.rule-text{font-size:11px}
@@ -44,10 +45,6 @@ export function installPlayGuide(app: GuideBridge): void {
   const guide = document.createElement('div');
   guide.className = 'play-guide';
   guide.innerHTML = `
-    <section class="guide-card">
-      <div class="guide-title">色塊說明（顏色 = 色塊編號）</div>
-      <div class="region-legend"></div>
-    </section>
     <section class="guide-card">
       <div class="guide-title">規則說明</div>
       <div class="rule-row">
@@ -69,6 +66,10 @@ export function installPlayGuide(app: GuideBridge): void {
         </div>
       </div>
     </section>
+    <section class="guide-card">
+      <div class="guide-title">色塊說明（顏色 = 色塊編號）</div>
+      <div class="region-legend"></div>
+    </section>
   `;
   mode.parentElement?.insertBefore(guide, mode);
 
@@ -80,6 +81,7 @@ export function installPlayGuide(app: GuideBridge): void {
     scheduled = false;
     const play = app.isPlayMode();
     guide.classList.toggle('visible', play);
+    document.body.classList.toggle('nq-play-mode', play);
     if (!play) return;
 
     const snapshot = app.getBoard();
@@ -95,7 +97,7 @@ export function installPlayGuide(app: GuideBridge): void {
       const queen = queensByRegion.get(region);
       item.innerHTML = `
         <div class="region-swatch" style="background:${COLORS[region % COLORS.length]}">${region + 1}</div>
-        <div class="region-queen-coordinate">${queen ? `(${queen.row + 1},${queen.col + 1})` : ''}</div>
+        <div class="region-queen-coordinate">${queen ? `C${queen.col + 1}R${queen.row + 1}` : ''}</div>
       `;
       legend.appendChild(item);
     }
