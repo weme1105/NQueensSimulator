@@ -54,8 +54,8 @@ export function installAnnotationCanvas(app: AnnotationBridge): void {
   const canvas = document.createElement('canvas');
   canvas.className = 'annotation-canvas';
   wrap.appendChild(canvas);
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return;
+  const context = canvas.getContext('2d');
+  if (!context) return;
 
   const toggle = tools.querySelector<HTMLButtonElement>('.annotation-toggle')!;
   const color = tools.querySelector<HTMLInputElement>('.annotation-color')!;
@@ -88,26 +88,26 @@ export function installAnnotationCanvas(app: AnnotationBridge): void {
     if (stroke.points.length < 2) return;
     const w = canvas.width;
     const h = canvas.height;
-    ctx.save();
-    ctx.globalCompositeOperation = stroke.erase ? 'destination-out' : 'source-over';
-    ctx.globalAlpha = stroke.erase ? 1 : stroke.opacity;
-    ctx.strokeStyle = stroke.color;
-    ctx.lineWidth = stroke.width * (window.devicePixelRatio || 1);
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
+    context.save();
+    context.globalCompositeOperation = stroke.erase ? 'destination-out' : 'source-over';
+    context.globalAlpha = stroke.erase ? 1 : stroke.opacity;
+    context.strokeStyle = stroke.color;
+    context.lineWidth = stroke.width * (window.devicePixelRatio || 1);
+    context.lineCap = 'round';
+    context.lineJoin = 'round';
+    context.beginPath();
     const first = stroke.points[0];
-    ctx.moveTo(first.x * w, first.y * h);
+    context.moveTo(first.x * w, first.y * h);
     for (let i = 1; i < stroke.points.length; i++) {
       const p = stroke.points[i];
-      ctx.lineTo(p.x * w, p.y * h);
+      context.lineTo(p.x * w, p.y * h);
     }
-    ctx.stroke();
-    ctx.restore();
+    context.stroke();
+    context.restore();
   };
 
   function redraw(): void {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    context.clearRect(0, 0, canvas.width, canvas.height);
     for (const stroke of strokes) drawStroke(stroke);
     if (activeStroke) drawStroke(activeStroke);
   }
