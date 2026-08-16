@@ -5,90 +5,137 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>N 皇后推演</title>
 <style>
-*{box-sizing:border-box}
-body{font-family:Arial,"Microsoft JhengHei",sans-serif;background:#f6f1ed;margin:0;color:#5b4444}
-.app{max-width:1180px;margin:22px auto;padding:0 16px}
-.toolbar,.panel{background:#fff;border-radius:16px;padding:16px;box-shadow:0 6px 20px #00000012}
-.toolbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
-input,button{font:inherit;padding:9px 12px;border:1px solid #e6d9d2;border-radius:10px;background:#fff}
-button{cursor:pointer;font-weight:700}
-.primary{background:#aa6b6b;color:#fff!important}
-.active{outline:3px solid #444}
-.stats{margin-left:auto;display:flex;gap:14px}
-.main{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px;margin-top:18px}
-.board{display:grid;gap:3px;width:100%;aspect-ratio:1/1;overflow:visible;touch-action:none;user-select:none;-webkit-user-select:none}
-.cell{position:relative;border:0;border-radius:7px;padding:0;display:block;color:#fff;min-width:0;min-height:0;width:100%;height:100%;overflow:visible}
-.cell.unassigned{background:#e9e4e1!important}
-.cell.conflict{outline:4px solid #e33;outline-offset:-4px}
-.cell.solved{z-index:5;box-shadow:0 0 0 4px #fff,0 8px 22px #0004}
+*{box-sizing:border-box}body{font-family:Arial,"Microsoft JhengHei",sans-serif;background:#f6f1ed;margin:0;color:#5b4444}
+.app{max-width:1180px;margin:22px auto;padding:0 16px}.toolbar,.panel{background:#fff;border-radius:16px;padding:16px;box-shadow:0 6px 20px #00000012}
+.toolbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap}input,button{font:inherit;padding:9px 12px;border:1px solid #e6d9d2;border-radius:10px;background:#fff}
+button{cursor:pointer;font-weight:700}.primary{background:#aa6b6b;color:#fff!important}.active{outline:3px solid #444}.stats{margin-left:auto;display:flex;gap:14px}
+.main{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:18px;margin-top:18px}.board{display:grid;gap:3px;width:100%;aspect-ratio:1/1;touch-action:none;user-select:none;-webkit-user-select:none}
+.cell{position:relative;border:0;border-radius:7px;padding:0;display:block;color:#fff;min-width:0;min-height:0;width:100%;height:100%}.cell.unassigned{background:#e9e4e1!important}
+.cell.conflict{outline:4px solid #e33;outline-offset:-4px}.cell.solved{z-index:5;box-shadow:0 0 0 4px #fff,0 8px 22px #0004}
 .mark{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:clamp(16px,2.2vw,30px);font-weight:bold;text-shadow:0 2px 3px #0005;line-height:1;pointer-events:none}
-.cell.solved .mark{font-size:clamp(30px,4vw,54px);transform:scale(1.18)}
-.palette{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 14px}
+.cell.solved .mark{font-size:clamp(30px,4vw,54px);transform:scale(1.18)}.palette{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 14px}
 .colorBtn{width:46px;height:46px;padding:0;border:3px solid transparent;border-radius:12px;position:relative;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
-.colorBtn.selected{border-color:#222;transform:scale(1.08)}
-.colorBtn span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;text-shadow:0 1px 3px #0009}
-.modeBox,.status{padding:10px 12px;border:1px solid #eaded8;border-radius:12px;line-height:1.5}
-.modeBox{background:#fff9f6;margin-bottom:10px}
+.colorBtn.selected{border-color:#222;transform:scale(1.08)}.colorBtn span{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:bold;text-shadow:0 1px 3px #0009}
+.modeBox,.status{padding:10px 12px;border:1px solid #eaded8;border-radius:12px;line-height:1.5}.modeBox{background:#fff9f6;margin-bottom:10px}
 .status{margin-top:12px;background:#fff7e6}.ok{background:#eef9ef;border-color:#c8e4cb}.bad{background:#fff0f0;border-color:#efbcbc}.info{background:#eef5ff;border-color:#cadcf4}.warn{background:#fff7e6;border-color:#ead8aa}
-.history{max-height:630px;overflow:auto}.item{border:1px solid #eaded8;border-radius:10px;padding:8px;margin-bottom:7px;background:#fff9f6}.solver{display:none;margin:12px 0}.solver button{margin:3px}.small{font-size:13px;color:#806f6f;line-height:1.6}
+.history{max-height:630px;overflow:auto}.item{border:1px solid #eaded8;border-radius:10px;padding:8px;margin-bottom:7px;background:#fff9f6}.solver{display:none;margin:12px 0}.solver button{margin:3px}
 @media(max-width:850px){.main{grid-template-columns:1fr}.stats{margin-left:0}.app{padding:0 8px}.toolbar,.panel{padding:12px}}
 </style>
 </head>
 <body>
 <div class="app">
-<div class="toolbar"><span>N：</span><input id="n" type="number" min="4" max="16" value="8" style="width:70px"><button id="new" class="primary">建立空白棋盤</button><button id="edit">設定色塊</button><button id="play">推演模式</button><button id="undo">上一步</button><button id="clear">清空推演</button><div class="stats"><span>操作：<b id="steps">0</b></span><span>皇后：<b id="queens">0 / 8</b></span></div></div>
-<div class="main"><section class="panel"><div id="mode" class="modeBox"></div><div id="palette" class="palette"></div><div id="board" class="board"></div><div id="status" class="status"></div></section><aside class="panel"><h3 style="margin-top:0">操作紀錄</h3><div id="solver" class="solver"><button id="stepSolve">推演一步</button><button id="autoQueen">自動推演到下一個皇后</button></div><div id="history" class="history">目前沒有操作。</div></aside></div>
+<div class="toolbar">
+  <span>N：</span><input id="n" type="number" min="4" max="16" value="8" style="width:70px">
+  <button id="new" class="primary">建立空白棋盤</button>
+  <button id="random">隨機唯一題目</button>
+  <button id="edit">設定色塊</button><button id="play">推演模式</button>
+  <button id="undo">上一步</button><button id="clear">清空推演</button>
+  <div class="stats"><span>操作：<b id="steps">0</b></span><span>皇后：<b id="queens">0 / 8</b></span></div>
 </div>
+<div class="main">
+<section class="panel"><div id="mode" class="modeBox"></div><div id="palette" class="palette"></div><div id="board" class="board"></div><div id="status" class="status"></div></section>
+<aside class="panel"><h3 style="margin-top:0">操作紀錄</h3><div id="solver" class="solver"><button id="stepSolve">推演一步</button><button id="autoQueen">自動推演到下一個皇后</button></div><div id="history" class="history">目前沒有操作。</div></aside>
+</div></div>
+
 <script>
 (()=>{'use strict';
 const COLORS=['#9cc7e8','#b97a56','#38a8bb','#ce6585','#d6a900','#7d68cf','#2f8f55','#85cf72','#ffd97d','#e983d3','#64c96d','#7bb2d8','#ed9e62','#a7a7e8','#65c2ad','#db7f95'];
-const $=id=>document.getElementById(id);const board=$('board'),palette=$('palette'),status=$('status'),historyEl=$('history'),solver=$('solver');
-let N=8,cells=[],hist=[],opCount=0,mode='edit',selected=0;let secret=0,unlocked=false;let pointerActive=false,pointerMoved=false,pointerStart=null,visited=new Set(),playDragMode='paintX';
-function setStatus(text,type=''){status.className='status'+(type?' '+type:'');status.textContent=text}
+const $=id=>document.getElementById(id),board=$('board'),palette=$('palette'),status=$('status'),historyEl=$('history'),solver=$('solver');
+let N=8,cells=[],hist=[],opCount=0,mode='edit',selected=0,secret=0,unlocked=false;
+let pointerActive=false,pointerMoved=false,pointerStart=null,visited=new Set(),playDragMode='paintX';
+
+function setStatus(t,k=''){status.className='status'+(k?' '+k:'');status.textContent=t}
+function makeEmpty(){cells=Array.from({length:N},(_,r)=>Array.from({length:N},(_,c)=>({row:r,col:c,regionId:-1,state:0,conflict:false})))}
+function build(){N=Math.max(4,Math.min(16,+$('n').value||8));$('n').value=N;makeEmpty();hist=[];opCount=0;selected=0;mode='edit';render();setStatus('空白棋盤已建立。請設定 '+N+' 個相連色塊。')}
 function regionCells(id,src=cells){return src.flat().filter(c=>c.regionId===id)}
-function isRegionConnected(id,src=cells){const group=regionCells(id,src);if(group.length<=1)return true;const all=new Set(group.map(c=>c.row+','+c.col)),seen=new Set(),q=[[group[0].row,group[0].col]];seen.add(q[0].join(','));while(q.length){const[r,c]=q.shift();for(const[dr,dc]of[[1,0],[-1,0],[0,1],[0,-1]]){const key=(r+dr)+','+(c+dc);if(all.has(key)&&!seen.has(key)){seen.add(key);q.push([r+dr,c+dc])}}}return seen.size===group.length}
-function build(){N=Math.max(4,Math.min(16,+$('n').value||8));$('n').value=N;cells=Array.from({length:N},(_,r)=>Array.from({length:N},(_,c)=>({row:r,col:c,regionId:-1,state:0,conflict:false})));hist=[];opCount=0;selected=0;mode='edit';render();setStatus('空白棋盤已建立。請設定 '+N+' 個相連色塊。')}
+function isRegionConnected(id,src=cells){const g=regionCells(id,src);if(g.length<=1)return true;const all=new Set(g.map(c=>c.row+','+c.col)),seen=new Set(),q=[[g[0].row,g[0].col]];seen.add(q[0].join(','));while(q.length){const[r,c]=q.shift();for(const[dr,dc]of[[1,0],[-1,0],[0,1],[0,-1]]){const k=(r+dr)+','+(c+dc);if(all.has(k)&&!seen.has(k)){seen.add(k);q.push([r+dr,c+dc])}}}return seen.size===g.length}
 function canPaint(cell,id){if(id<0||cell.regionId===id||regionCells(id).length===0)return true;return[[1,0],[-1,0],[0,1],[0,-1]].some(([dr,dc])=>{const r=cell.row+dr,c=cell.col+dc;return r>=0&&c>=0&&r<N&&c<N&&cells[r][c].regionId===id})}
 function removeColor(cell){const old=cell.regionId;if(old<0)return true;cell.regionId=-1;if(!isRegionConnected(old)){cell.regionId=old;setStatus('不能移除：會讓原色塊斷開。','bad');return false}return true}
 function paintRegionCell(r,c,toggle=false){const cell=cells[r][c];if(selected===-1){if(removeColor(cell)){updateCellVisual(r,c);liveCheck()}return}if(toggle&&cell.regionId===selected){if(removeColor(cell)){updateCellVisual(r,c);liveCheck()}return}if(cell.regionId===selected)return;if(!canPaint(cell,selected)){setStatus('同一顏色必須上下左右相連。','bad');return}const old=cell.regionId;cell.regionId=selected;if(old>=0&&!isRegionConnected(old)){cell.regionId=old;setStatus('不能改色：會讓原色塊斷開。','bad');return}updateCellVisual(r,c);liveCheck()}
-function validateRegions(){const empty=cells.flat().filter(c=>c.regionId<0).length;if(empty)return{ok:false,msg:'還有 '+empty+' 格尚未設定顏色。'};for(let i=0;i<N;i++){if(!regionCells(i).length)return{ok:false,msg:'色塊 '+(i+1)+' 尚未使用。'};if(!isRegionConnected(i))return{ok:false,msg:'色塊 '+(i+1)+' 不相連。'}}return{ok:true}}
+function validateRegions(src=cells){const empty=src.flat().filter(c=>c.regionId<0).length;if(empty)return{ok:false,msg:'還有 '+empty+' 格尚未設定顏色。'};for(let i=0;i<N;i++){if(!regionCells(i,src).length)return{ok:false,msg:'色塊 '+(i+1)+' 尚未使用。'};if(!isRegionConnected(i,src))return{ok:false,msg:'色塊 '+(i+1)+' 不相連。'}}return{ok:true}}
 function queenConflict(a,b){return a.row===b.row||a.col===b.col||a.regionId===b.regionId||(Math.abs(a.row-b.row)<=1&&Math.abs(a.col-b.col)<=1)}
-function countSolutions(limit=2){const basic=validateRegions();if(!basic.ok)return{count:0,basicError:basic.msg};let count=0,firstSolution=null;const usedCols=new Set(),usedRegions=new Set(),placed=[],remainingRows=Array.from({length:N},(_,r)=>r);function candidatesForRow(r){return cells[r].filter(c=>!usedCols.has(c.col)&&!usedRegions.has(c.regionId)&&!placed.some(q=>Math.abs(q.row-c.row)<=1&&Math.abs(q.col-c.col)<=1))}function dfs(depth){if(count>=limit)return;if(depth===N){count++;if(!firstSolution)firstSolution=placed.map(c=>({row:c.row,col:c.col}));return}let bestPos=depth,bestCandidates=null;for(let i=depth;i<N;i++){const r=remainingRows[i],cand=candidatesForRow(r);if(bestCandidates===null||cand.length<bestCandidates.length){bestCandidates=cand;bestPos=i;if(cand.length===0)break}}if(!bestCandidates||bestCandidates.length===0)return;[remainingRows[depth],remainingRows[bestPos]]=[remainingRows[bestPos],remainingRows[depth]];for(const cell of bestCandidates){usedCols.add(cell.col);usedRegions.add(cell.regionId);placed.push(cell);dfs(depth+1);placed.pop();usedRegions.delete(cell.regionId);usedCols.delete(cell.col);if(count>=limit)break}[remainingRows[depth],remainingRows[bestPos]]=[remainingRows[bestPos],remainingRows[depth]]}dfs(0);return{count,firstSolution}}
-function puzzleStatus(){const basic=validateRegions();if(!basic.ok)return{ok:false,type:'incomplete',msg:basic.msg};const result=countSolutions(2);if(result.count===0)return{ok:false,type:'none',msg:'此色塊配置無解，請調整色塊。'};if(result.count===1)return{ok:true,type:'unique',msg:'題目驗證通過：唯一解。'};return{ok:true,type:'multiple',msg:'題目可解，但存在多組解，不是唯一解。'}}
+
+function countSolutionsOn(src,limit=2,allowUnassigned=false){
+  if(!allowUnassigned){const basic=validateRegions(src);if(!basic.ok)return{count:0,basicError:basic.msg}}
+  let count=0,firstSolution=null;const usedCols=new Set(),usedRegions=new Set(),placed=[],rows=Array.from({length:N},(_,r)=>r);
+  function candidatesForRow(r){return src[r].filter(c=>c.regionId>=0&&!usedCols.has(c.col)&&!usedRegions.has(c.regionId)&&!placed.some(q=>Math.abs(q.row-c.row)<=1&&Math.abs(q.col-c.col)<=1))}
+  function dfs(depth){if(count>=limit)return;if(depth===N){count++;if(!firstSolution)firstSolution=placed.map(c=>({row:c.row,col:c.col}));return}
+    let best=depth,bestCand=null;for(let i=depth;i<N;i++){const cand=candidatesForRow(rows[i]);if(bestCand===null||cand.length<bestCand.length){bestCand=cand;best=i;if(!cand.length)break}}if(!bestCand||!bestCand.length)return;
+    [rows[depth],rows[best]]=[rows[best],rows[depth]];for(const c of bestCand){usedCols.add(c.col);usedRegions.add(c.regionId);placed.push(c);dfs(depth+1);placed.pop();usedRegions.delete(c.regionId);usedCols.delete(c.col);if(count>=limit)break}[rows[depth],rows[best]]=[rows[best],rows[depth]]
+  }dfs(0);return{count,firstSolution}
+}
+function countSolutions(limit=2){return countSolutionsOn(cells,limit,false)}
+function puzzleStatus(){const b=validateRegions();if(!b.ok)return{ok:false,type:'incomplete',msg:b.msg};const r=countSolutions(2);if(r.count===0)return{ok:false,type:'none',msg:'此色塊配置無解，請調整色塊。'};if(r.count===1)return{ok:true,type:'unique',msg:'題目驗證通過：唯一解。'};return{ok:true,type:'multiple',msg:'題目可解，但存在多組解，不是唯一解。'}}
 function liveCheck(){const empty=cells.flat().filter(c=>c.regionId<0).length;if(empty){setStatus('色塊設定中：還有 '+empty+' 格尚未分配顏色。');return}const p=puzzleStatus();setStatus((p.type==='unique'?'✓ ':p.type==='multiple'?'△ ':'✗ ')+p.msg,p.type==='unique'?'ok':p.type==='multiple'?'warn':'bad')}
 function enterPlay(){const p=puzzleStatus();if(!p.ok){setStatus(p.msg,'bad');return}mode='play';render();setStatus(p.msg,p.type==='unique'?'ok':'warn')}
-function pushAction(label,changes,type='manual'){if(!changes.length)return;const entry={label,type,changes:[]};for(const ch of changes){const cell=cells[ch.row][ch.col];entry.changes.push({row:ch.row,col:ch.col,state:cell.state});cell.state=ch.newState}hist.push(entry);opCount++;validateQueens()}
+
+function pushAction(label,changes,type='manual'){if(!changes.length)return;const e={label,type,changes:[]};for(const ch of changes){const cell=cells[ch.row][ch.col];e.changes.push({row:ch.row,col:ch.col,state:cell.state});cell.state=ch.newState}hist.push(e);opCount++;validateQueens()}
 function cycleCell(r,c){const cell=cells[r][c];pushAction('手動：R'+(r+1)+'C'+(c+1),[{row:r,col:c,newState:(cell.state+1)%3}]);render()}
 function dragPlayCell(r,c){const key=r+','+c;if(visited.has(key))return;visited.add(key);const cell=cells[r][c];if(playDragMode==='eraseX'){if(cell.state!==1)return;pushAction('清除 X：R'+(r+1)+'C'+(c+1),[{row:r,col:c,newState:0}])}else{if(cell.state!==0)return;pushAction('畫 X：R'+(r+1)+'C'+(c+1),[{row:r,col:c,newState:1}])}updateCellVisual(r,c);updateStatsAndHistory()}
-function undo(){const entry=hist.pop();if(!entry)return;for(let i=entry.changes.length-1;i>=0;i--){const ch=entry.changes[i];cells[ch.row][ch.col].state=ch.state}opCount=Math.max(0,opCount-1);validateQueens();render()}
+function undo(){const e=hist.pop();if(!e)return;for(let i=e.changes.length-1;i>=0;i--){const ch=e.changes[i];cells[ch.row][ch.col].state=ch.state}opCount=Math.max(0,opCount-1);validateQueens();render()}
 function clearPlay(){cells.flat().forEach(c=>{c.state=0;c.conflict=false});hist=[];opCount=0;render()}
-function validateQueens(){cells.flat().forEach(c=>c.conflict=false);const qs=cells.flat().filter(c=>c.state===2);for(let i=0;i<qs.length;i++)for(let j=i+1;j<qs.length;j++){if(queenConflict(qs[i],qs[j]))qs[i].conflict=qs[j].conflict=true}}
-function contradiction(src=cells){const qs=src.flat().filter(c=>c.state===2);for(let i=0;i<qs.length;i++)for(let j=i+1;j<qs.length;j++)if(queenConflict(qs[i],qs[j]))return'皇后互相衝突';for(const kind of['row','col','region'])for(let i=0;i<N;i++){const unit=kind==='row'?src[i]:kind==='col'?src.map(r=>r[i]):src.flat().filter(c=>c.regionId===i);if(unit.filter(c=>c.state===2).length>1)return kind+' '+(i+1)+' 有多個皇后';const possible=unit.filter(c=>c.state===2||(c.state===0&&!qs.some(q=>q!==c&&queenConflict(c,q))));if(!possible.length)return kind+' '+(i+1)+' 沒有候選格'}return null}
+function validateQueens(){cells.flat().forEach(c=>c.conflict=false);const qs=cells.flat().filter(c=>c.state===2);for(let i=0;i<qs.length;i++)for(let j=i+1;j<qs.length;j++)if(queenConflict(qs[i],qs[j]))qs[i].conflict=qs[j].conflict=true}
+
 function unitCells(src,kind,index){return kind==='row'?src[index]:kind==='col'?src.map(r=>r[index]):src.flat().filter(c=>c.regionId===index)}
 function unitLabel(kind,index){return(kind==='row'?'Row ':kind==='col'?'Column ':'Region ')+(index+1)}
+function contradiction(src=cells){const qs=src.flat().filter(c=>c.state===2);for(let i=0;i<qs.length;i++)for(let j=i+1;j<qs.length;j++)if(queenConflict(qs[i],qs[j]))return'皇后互相衝突';for(const kind of['row','col','region'])for(let i=0;i<N;i++){const u=unitCells(src,kind,i);if(u.filter(c=>c.state===2).length>1)return unitLabel(kind,i)+' 有多個皇后';const possible=u.filter(c=>c.state===2||(c.state===0&&!qs.some(q=>q!==c&&queenConflict(c,q))));if(!possible.length)return unitLabel(kind,i)+' 沒有候選格'}return null}
 function isCandidate(cell,src=cells){if(cell.state!==0)return false;const qs=src.flat().filter(c=>c.state===2);return!qs.some(q=>queenConflict(cell,q))}
-function direct(src=cells){const bad=contradiction(src);if(bad)return{bad};for(const q of src.flat().filter(c=>c.state===2)){const affected=src.flat().filter(c=>c.state===0&&queenConflict(c,q));if(affected.length)return{label:'皇后 R'+(q.row+1)+'C'+(q.col+1)+' 排除 '+affected.length+' 格',changes:affected.map(c=>({row:c.row,col:c.col,newState:1}))}}for(const kind of['row','col','region'])for(let i=0;i<N;i++){const unit=unitCells(src,kind,i);if(unit.some(c=>c.state===2))continue;const cand=unit.filter(c=>isCandidate(c,src));if(cand.length===1){const c=cand[0];return{label:unitLabel(kind,i)+' 只剩唯一候選 R'+(c.row+1)+'C'+(c.col+1),changes:[{row:c.row,col:c.col,newState:2}]}}}for(let region=0;region<N;region++){const rc=unitCells(src,'region',region);if(rc.some(c=>c.state===2))continue;const cand=rc.filter(c=>isCandidate(c,src));if(cand.length<2)continue;const rows=[...new Set(cand.map(c=>c.row))];if(rows.length===1){const r=rows[0],affected=src[r].filter(c=>c.regionId!==region&&isCandidate(c,src));if(affected.length)return{label:'Region '+(region+1)+' 的候選全部位於 Row '+(r+1)+'，排除該列色塊外候選',changes:affected.map(c=>({row:c.row,col:c.col,newState:1}))}}const cols=[...new Set(cand.map(c=>c.col))];if(cols.length===1){const col=cols[0],affected=src.map(row=>row[col]).filter(c=>c.regionId!==region&&isCandidate(c,src));if(affected.length)return{label:'Region '+(region+1)+' 的候選全部位於 Column '+(col+1)+'，排除該欄色塊外候選',changes:affected.map(c=>({row:c.row,col:c.col,newState:1}))}}}for(const kind of['row','col'])for(let i=0;i<N;i++){const unit=unitCells(src,kind,i);if(unit.some(c=>c.state===2))continue;const cand=unit.filter(c=>isCandidate(c,src));if(cand.length<2)continue;const regions=[...new Set(cand.map(c=>c.regionId))];if(regions.length!==1)continue;const region=regions[0],affected=unitCells(src,'region',region).filter(c=>isCandidate(c,src)&&(kind==='row'?c.row!==i:c.col!==i));if(affected.length)return{label:unitLabel(kind,i)+' 的候選全部位於 Region '+(region+1)+'，排除該色塊其他候選',changes:affected.map(c=>({row:c.row,col:c.col,newState:1}))}}return null}
+function bitCount(x){let n=0;while(x){x&=x-1;n++}return n}
+
+function hallSubsetDeduction(src,kind){
+  const active=[];for(let i=0;i<N;i++){const u=unitCells(src,kind,i);if(!u.some(c=>c.state===2))active.push(i)}const m=active.length;if(m<2||m>16)return null;
+  const masks=active.map(i=>{let mask=0;for(const c of unitCells(src,kind,i).filter(c=>isCandidate(c,src)))mask|=(1<<c.regionId);return mask});const total=1<<m,union=new Uint32Array(total);
+  for(let subset=1;subset<total-1;subset++){const lsb=subset&-subset,idx=31-Math.clz32(lsb),prev=subset^lsb;union[subset]=union[prev]|masks[idx];const k=bitCount(subset);if(k<2||bitCount(union[subset])!==k)continue;
+    const selectedUnits=new Set(),selectedRegions=new Set();for(let j=0;j<m;j++)if(subset&(1<<j))selectedUnits.add(active[j]);for(let r=0;r<N;r++)if(union[subset]&(1<<r))selectedRegions.add(r);
+    const affected=src.flat().filter(c=>isCandidate(c,src)&&selectedRegions.has(c.regionId)&&!selectedUnits.has(kind==='row'?c.row:c.col));if(affected.length){const us=[...selectedUnits].map(x=>x+1).join(','),rs=[...selectedRegions].map(x=>x+1).join(',');return{label:(kind==='row'?'Rows ':'Columns ')+us+' 的候選完整包覆 '+k+' 個色塊 ['+rs+']，排除這些色塊在其他'+(kind==='row'?'列':'欄')+'的候選',changes:affected.map(c=>({row:c.row,col:c.col,newState:1}))}}
+  }return null
+}
+
+function direct(src=cells){
+  const bad=contradiction(src);if(bad)return{bad};
+  for(const q of src.flat().filter(c=>c.state===2)){const a=src.flat().filter(c=>c.state===0&&queenConflict(c,q));if(a.length)return{label:'皇后 R'+(q.row+1)+'C'+(q.col+1)+' 排除 '+a.length+' 格',changes:a.map(c=>({row:c.row,col:c.col,newState:1}))}}
+  for(const kind of['row','col','region'])for(let i=0;i<N;i++){const u=unitCells(src,kind,i);if(u.some(c=>c.state===2))continue;const cand=u.filter(c=>isCandidate(c,src));if(cand.length===1){const c=cand[0];return{label:unitLabel(kind,i)+' 只剩唯一候選 R'+(c.row+1)+'C'+(c.col+1),changes:[{row:c.row,col:c.col,newState:2}]}}}
+  for(let region=0;region<N;region++){const u=unitCells(src,'region',region);if(u.some(c=>c.state===2))continue;const cand=u.filter(c=>isCandidate(c,src));if(cand.length<2)continue;const rows=[...new Set(cand.map(c=>c.row))];if(rows.length===1){const r=rows[0],a=src[r].filter(c=>c.regionId!==region&&isCandidate(c,src));if(a.length)return{label:'Region '+(region+1)+' 候選都在 Row '+(r+1)+'，排除該列其他色塊',changes:a.map(c=>({row:c.row,col:c.col,newState:1}))}}const cols=[...new Set(cand.map(c=>c.col))];if(cols.length===1){const col=cols[0],a=src.map(row=>row[col]).filter(c=>c.regionId!==region&&isCandidate(c,src));if(a.length)return{label:'Region '+(region+1)+' 候選都在 Column '+(col+1)+'，排除該欄其他色塊',changes:a.map(c=>({row:c.row,col:c.col,newState:1}))}}}
+  for(const kind of['row','col'])for(let i=0;i<N;i++){const u=unitCells(src,kind,i);if(u.some(c=>c.state===2))continue;const cand=u.filter(c=>isCandidate(c,src));if(cand.length<2)continue;const regs=[...new Set(cand.map(c=>c.regionId))];if(regs.length===1){const region=regs[0],a=unitCells(src,'region',region).filter(c=>isCandidate(c,src)&&(kind==='row'?c.row!==i:c.col!==i));if(a.length)return{label:unitLabel(kind,i)+' 候選都在 Region '+(region+1)+'，排除該色塊其他候選',changes:a.map(c=>({row:c.row,col:c.col,newState:1}))}}}
+  const hr=hallSubsetDeduction(src,'row');if(hr)return hr;const hc=hallSubsetDeduction(src,'col');if(hc)return hc;return null
+}
 function cloneState(src=cells){return src.map(row=>row.map(c=>({...c})))}
 function applyToSim(src,d){for(const ch of d.changes||[])src[ch.row][ch.col].state=ch.newState}
-function deterministicClosure(src){const limit=N*N*12;for(let guard=0;guard<limit;guard++){const bad=contradiction(src);if(bad)return{contradiction:true,reason:bad};const d=direct(src);if(!d)return{contradiction:false};if(d.bad)return{contradiction:true,reason:d.bad};applyToSim(src,d)}return{contradiction:false}}
-function proofDeduction(src=cells){const candidates=src.flat().filter(c=>isCandidate(c,src));for(const c of candidates){const sim=cloneState(src);sim[c.row][c.col].state=2;const result=deterministicClosure(sim);if(result.contradiction)return{label:'反證：假設 R'+(c.row+1)+'C'+(c.col+1)+' 是皇后會造成「'+result.reason+'」，因此必為 X',changes:[{row:c.row,col:c.col,newState:1}]}}for(const c of candidates){const sim=cloneState(src);sim[c.row][c.col].state=1;const result=deterministicClosure(sim);if(result.contradiction)return{label:'反證：假設 R'+(c.row+1)+'C'+(c.col+1)+' 是 X 會造成「'+result.reason+'」，因此必為皇后',changes:[{row:c.row,col:c.col,newState:2}]}}return null}
-function nextDeduction(src=cells){const d=direct(src);if(d)return d;return proofDeduction(src)}
-function solveOneStep(){if(mode!=='play'){setStatus('請先進入推演模式。','bad');return false}const d=nextDeduction(cells);if(!d){setStatus('目前沒有能證明的下一步；程式不會猜。','info');return false}if(d.bad){setStatus('矛盾：'+d.bad,'bad');return false}pushAction('推演：'+d.label,d.changes,'logic');render();setStatus(d.label,'info');return true}
-function autoUntilNextQueen(){if(mode!=='play'){setStatus('請先進入推演模式。','bad');return}const before=cells.flat().filter(c=>c.state===2).length;if(before>=N){setStatus('已完成。','ok');return}let operations=0;const limit=N*N*12;while(operations<limit){const d=nextDeduction(cells);if(!d){render();setStatus('已停止：目前沒有能證明的下一步；沒有進行猜測。','info');return}if(d.bad){setStatus('矛盾：'+d.bad,'bad');return}pushAction('推演：'+d.label,d.changes,'logic');operations++;const now=cells.flat().filter(c=>c.state===2).length;if(now>before){render();setStatus('已推演到下一個皇后，共執行 '+operations+' 個確定操作。','info');return}}render();setStatus('已達單次推演安全上限。','warn')}
+function deterministicClosure(src){for(let g=0;g<N*N*20;g++){const bad=contradiction(src);if(bad)return{contradiction:true,reason:bad};const d=direct(src);if(!d)return{contradiction:false};if(d.bad)return{contradiction:true,reason:d.bad};applyToSim(src,d)}return{contradiction:false}}
+function proofDeduction(src=cells){const cand=src.flat().filter(c=>isCandidate(c,src));for(const c of cand){const sim=cloneState(src);sim[c.row][c.col].state=2;const r=deterministicClosure(sim);if(r.contradiction)return{label:'反證：假設 R'+(c.row+1)+'C'+(c.col+1)+' 是皇后會造成「'+r.reason+'」，因此必為 X',changes:[{row:c.row,col:c.col,newState:1}]}}for(const c of cand){const sim=cloneState(src);sim[c.row][c.col].state=1;const r=deterministicClosure(sim);if(r.contradiction)return{label:'反證：假設 R'+(c.row+1)+'C'+(c.col+1)+' 是 X 會造成「'+r.reason+'」，因此必為皇后',changes:[{row:c.row,col:c.col,newState:2}]}}return null}
+function nextDeduction(src=cells){return direct(src)||proofDeduction(src)}
+function solveOneStep(){if(mode!=='play'){setStatus('請先進入推演模式。','bad');return}const d=nextDeduction();if(!d){setStatus('目前沒有能證明的下一步；程式不會猜。','info');return}if(d.bad){setStatus('矛盾：'+d.bad,'bad');return}pushAction('推演：'+d.label,d.changes,'logic');render();setStatus(d.label,'info')}
+function autoUntilNextQueen(){if(mode!=='play'){setStatus('請先進入推演模式。','bad');return}const before=cells.flat().filter(c=>c.state===2).length;if(before>=N){setStatus('已完成。','ok');return}let ops=0;for(;ops<N*N*20;ops++){const d=nextDeduction();if(!d){render();setStatus('已停止：沒有能證明的下一步；沒有猜測。','info');return}if(d.bad){setStatus('矛盾：'+d.bad,'bad');return}pushAction('推演：'+d.label,d.changes,'logic');if(cells.flat().filter(c=>c.state===2).length>before){render();setStatus('已推演到下一個皇后，共 '+(ops+1)+' 個確定操作。','info');return}}render();setStatus('已達單次推演安全上限。','warn')}
+
+function shuffled(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function randomQueenLayout(){const used=new Set(),sol=[];function dfs(r){if(r===N)return true;const choices=shuffled(Array.from({length:N},(_,i)=>i).filter(c=>!used.has(c)&&(r===0||Math.abs(c-sol[r-1])>1)));for(const c of choices){used.add(c);sol.push(c);if(dfs(r+1))return true;sol.pop();used.delete(c)}return false}return dfs(0)?sol:null}
+function growUniqueRegions(solution){
+  const work=Array.from({length:N},(_,r)=>Array.from({length:N},(_,c)=>({row:r,col:c,regionId:-1,state:0,conflict:false})));for(let r=0;r<N;r++)work[r][solution[r]].regionId=r;let left=N*N-N;
+  while(left){let options=[];for(let r=0;r<N;r++)for(let c=0;c<N;c++)if(work[r][c].regionId<0){const neigh=new Set();for(const[dr,dc]of[[1,0],[-1,0],[0,1],[0,-1]]){const rr=r+dr,cc=c+dc;if(rr>=0&&cc>=0&&rr<N&&cc<N&&work[rr][cc].regionId>=0)neigh.add(work[rr][cc].regionId)}for(const rid of neigh)options.push([r,c,rid])}options=shuffled(options);const valid=[];
+    for(const[r,c,rid]of options){work[r][c].regionId=rid;if(countSolutionsOn(work,2,true).count===1)valid.push([r,c,rid]);work[r][c].regionId=-1;if(valid.length>=6)break}if(!valid.length)return null;const[r,c,rid]=valid[Math.floor(Math.random()*valid.length)];work[r][c].regionId=rid;left--;
+  }return work
+}
+async function randomUniquePuzzle(){N=Math.max(4,Math.min(16,+$('n').value||8));$('n').value=N;if(N>10){setStatus('隨機唯一題目目前為避免手機長時間卡住，先限制 N ≤ 10。','warn');return}setStatus('正在產生隨機唯一題目…','info');$('random').disabled=true;
+  for(let attempt=1;attempt<=40;attempt++){const sol=randomQueenLayout();if(sol){const work=growUniqueRegions(sol);if(work){cells=work;hist=[];opCount=0;selected=0;mode='edit';render();const p=puzzleStatus();if(p.type==='unique'){setStatus('✓ 已產生隨機唯一解題目（第 '+attempt+' 次嘗試）。','ok');$('random').disabled=false;return}}}if(attempt%2===0)await new Promise(r=>setTimeout(r,0))}
+  $('random').disabled=false;setStatus('這次沒有產生成功，請再按一次「隨機唯一題目」。','warn')
+}
+
 function solved(){return cells.flat().filter(c=>c.state===2).length===N&&!contradiction()}
 function renderPalette(){palette.innerHTML='';for(let i=0;i<N;i++){const b=document.createElement('button');b.className='colorBtn'+(i===selected?' selected':'');b.style.background=COLORS[i%COLORS.length];b.innerHTML='<span>'+(i+1)+'</span>';b.onpointerdown=e=>{e.preventDefault();secret=0;selected=i;for(const x of palette.querySelectorAll('.colorBtn'))x.classList.remove('selected');b.classList.add('selected')};palette.appendChild(b)}const e=document.createElement('button');e.className='colorBtn'+(selected===-1?' selected':'');e.style.background='#eee';e.innerHTML='<span style="color:#555;text-shadow:none">⌫</span>';e.onpointerdown=ev=>{ev.preventDefault();secret=0;selected=-1;for(const x of palette.querySelectorAll('.colorBtn'))x.classList.remove('selected');e.classList.add('selected')};palette.appendChild(e)}
 function cellElement(r,c){return board.querySelector('.cell[data-row="'+r+'"][data-col="'+c+'"]')}
-function updateCellVisual(r,c){const cell=cells[r][c],el=cellElement(r,c);if(!el)return;el.classList.toggle('unassigned',cell.regionId<0);el.classList.toggle('conflict',!!cell.conflict);if(cell.regionId>=0)el.style.background=COLORS[cell.regionId%COLORS.length];else el.style.background='';el.querySelector('.mark').textContent=cell.state===1?'✕':cell.state===2?'👑':''}
+function updateCellVisual(r,c){const cell=cells[r][c],el=cellElement(r,c);if(!el)return;el.classList.toggle('unassigned',cell.regionId<0);el.classList.toggle('conflict',!!cell.conflict);el.style.background=cell.regionId>=0?COLORS[cell.regionId%COLORS.length]:'';el.querySelector('.mark').textContent=cell.state===1?'✕':cell.state===2?'👑':''}
 function renderBoard(){board.innerHTML='';board.style.gridTemplateColumns='repeat('+N+',1fr)';board.style.gridTemplateRows='repeat('+N+',1fr)';const done=solved();for(const c of cells.flat()){const b=document.createElement('button');b.type='button';b.dataset.row=c.row;b.dataset.col=c.col;b.className='cell'+(c.regionId<0?' unassigned':'')+(c.conflict?' conflict':'')+(done&&c.state===2?' solved':'');if(c.regionId>=0)b.style.background=COLORS[c.regionId%COLORS.length];b.innerHTML='<span class="mark">'+(c.state===1?'✕':c.state===2?'👑':'')+'</span>';board.appendChild(b)}}
 function updateStatsAndHistory(){$('steps').textContent=opCount;$('queens').textContent=cells.flat().filter(c=>c.state===2).length+' / '+N;historyEl.innerHTML=hist.length?'':'目前沒有操作。';[...hist].reverse().forEach(h=>{const d=document.createElement('div');d.className='item';d.textContent=h.label;historyEl.appendChild(d)})}
-function render(){renderPalette();renderBoard();updateStatsAndHistory();$('edit').classList.toggle('active',mode==='edit');$('play').classList.toggle('active',mode==='play');palette.style.display=mode==='edit'?'flex':'none';$('mode').innerHTML=mode==='edit'?'<b>色塊設定模式</b>：N 種顏色 + 1 個橡皮擦；同色必須相連。手機可按住拖曳上色。':'<b>推演模式</b>：單點空白→X→👑→空白。拖曳從空白/皇冠開始會畫 X；從 X 開始會沿路清除 X，皇冠不受影響。';if(unlocked)solver.style.display='block';if(mode==='play'&&solved())setStatus('完成！','ok')}
-function hitCellFromPoint(x,y){const el=document.elementFromPoint(x,y),cell=el&&el.closest?el.closest('.cell'):null;if(!cell||!board.contains(cell))return null;return{row:+cell.dataset.row,col:+cell.dataset.col,el:cell}}
-board.addEventListener('pointerdown',e=>{if(e.button!==0&&e.pointerType==='mouse')return;const hit=hitCellFromPoint(e.clientX,e.clientY);if(!hit)return;e.preventDefault();secret=0;pointerActive=true;pointerMoved=false;visited=new Set();pointerStart={row:hit.row,col:hit.col,originalRegion:cells[hit.row][hit.col].regionId,originalState:cells[hit.row][hit.col].state};board.setPointerCapture?.(e.pointerId);if(mode==='edit'){if(selected===-1)paintRegionCell(hit.row,hit.col,false);else if(cells[hit.row][hit.col].regionId!==selected)paintRegionCell(hit.row,hit.col,false)}else{playDragMode=pointerStart.originalState===1?'eraseX':'paintX'}});
-board.addEventListener('pointermove',e=>{if(!pointerActive)return;e.preventDefault();const hit=hitCellFromPoint(e.clientX,e.clientY);if(!hit)return;const key=hit.row+','+hit.col,startKey=pointerStart.row+','+pointerStart.col;if(key!==startKey&&!pointerMoved){pointerMoved=true;if(mode==='play')dragPlayCell(pointerStart.row,pointerStart.col)}if(mode==='edit'){if(!visited.has(key)){visited.add(key);paintRegionCell(hit.row,hit.col,false)}}else dragPlayCell(hit.row,hit.col)});
-function finishPointer(e){if(!pointerActive)return;pointerActive=false;try{board.releasePointerCapture?.(e.pointerId)}catch(_){}const hit=hitCellFromPoint(e.clientX,e.clientY);if(hit&&!pointerMoved&&pointerStart&&hit.row===pointerStart.row&&hit.col===pointerStart.col){if(mode==='edit'){if(selected!==-1&&pointerStart.originalRegion===selected)paintRegionCell(hit.row,hit.col,true)}else cycleCell(hit.row,hit.col)}pointerStart=null;render()}
-board.addEventListener('pointerup',finishPointer);board.addEventListener('pointercancel',e=>{pointerActive=false;pointerStart=null;render()});
-$('new').onclick=()=>{secret++;if(secret>=7){unlocked=true;solver.style.display='block'}build();if(unlocked)solver.style.display='block'};$('edit').onclick=()=>{secret=0;mode='edit';render()};$('play').onclick=()=>{secret=0;enterPlay()};$('undo').onclick=()=>{secret=0;undo()};$('clear').onclick=()=>{secret=0;clearPlay()};$('stepSolve').onclick=solveOneStep;$('autoQueen').onclick=autoUntilNextQueen;build();
+function render(){renderPalette();renderBoard();updateStatsAndHistory();$('edit').classList.toggle('active',mode==='edit');$('play').classList.toggle('active',mode==='play');palette.style.display=mode==='edit'?'flex':'none';$('mode').innerHTML=mode==='edit'?'<b>色塊設定模式</b>：N 種顏色 + 1 個橡皮擦；同色必須相連。':'<b>推演模式</b>：單點空白→X→👑→空白；拖曳從空白/皇冠開始畫 X，從 X 開始則沿路清除 X。';if(unlocked)solver.style.display='block';if(mode==='play'&&solved())setStatus('完成！','ok')}
+function hitCellFromPoint(x,y){const el=document.elementFromPoint(x,y),cell=el&&el.closest?el.closest('.cell'):null;if(!cell||!board.contains(cell))return null;return{row:+cell.dataset.row,col:+cell.dataset.col}}
+board.addEventListener('pointerdown',e=>{if(e.button!==0&&e.pointerType==='mouse')return;const h=hitCellFromPoint(e.clientX,e.clientY);if(!h)return;e.preventDefault();secret=0;pointerActive=true;pointerMoved=false;visited=new Set();pointerStart={row:h.row,col:h.col,originalRegion:cells[h.row][h.col].regionId,originalState:cells[h.row][h.col].state};board.setPointerCapture?.(e.pointerId);if(mode==='edit'){if(selected===-1||cells[h.row][h.col].regionId!==selected)paintRegionCell(h.row,h.col,false)}else playDragMode=pointerStart.originalState===1?'eraseX':'paintX'});
+board.addEventListener('pointermove',e=>{if(!pointerActive)return;e.preventDefault();const h=hitCellFromPoint(e.clientX,e.clientY);if(!h)return;const key=h.row+','+h.col,start=pointerStart.row+','+pointerStart.col;if(key!==start&&!pointerMoved){pointerMoved=true;if(mode==='play')dragPlayCell(pointerStart.row,pointerStart.col)}if(mode==='edit'){if(!visited.has(key)){visited.add(key);paintRegionCell(h.row,h.col,false)}}else dragPlayCell(h.row,h.col)});
+function finishPointer(e){if(!pointerActive)return;pointerActive=false;try{board.releasePointerCapture?.(e.pointerId)}catch(_){}const h=hitCellFromPoint(e.clientX,e.clientY);if(h&&!pointerMoved&&pointerStart&&h.row===pointerStart.row&&h.col===pointerStart.col){if(mode==='edit'){if(selected!==-1&&pointerStart.originalRegion===selected)paintRegionCell(h.row,h.col,true)}else cycleCell(h.row,h.col)}pointerStart=null;render()}
+board.addEventListener('pointerup',finishPointer);board.addEventListener('pointercancel',()=>{pointerActive=false;pointerStart=null;render()});
+
+$('new').onclick=()=>{secret++;if(secret>=7){unlocked=true;solver.style.display='block'}build();if(unlocked)solver.style.display='block'};
+$('random').onclick=()=>{secret=0;randomUniquePuzzle()};$('edit').onclick=()=>{secret=0;mode='edit';render()};$('play').onclick=()=>{secret=0;enterPlay()};$('undo').onclick=()=>{secret=0;undo()};$('clear').onclick=()=>{secret=0;clearPlay()};$('stepSolve').onclick=solveOneStep;$('autoQueen').onclick=autoUntilNextQueen;
+build();
 })();
 </script>
-</body>
-</html>
+</body></html>
