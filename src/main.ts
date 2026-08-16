@@ -1,6 +1,7 @@
 import { installAnnotationCanvas } from './annotationCanvas';
 import { installCellLabels } from './cellLabels';
 import { installCoordinateDisplayNormalization } from './coordinateDisplay';
+import { installFreeRegionEditor } from './freeRegionEditor';
 import { installPlayGuide } from './playGuide';
 import { installRegionColors } from './regionColors';
 import { installSolverButtonLayout } from './solverButtonLayout';
@@ -36,6 +37,7 @@ installAnnotationCanvas(app);
 installCoordinateDisplayNormalization();
 installRegionColors(app);
 installSolverButtonLayout();
+installFreeRegionEditor(app);
 
 const worker = new SolverWorkerClient();
 const stepButton = document.querySelector<HTMLButtonElement>('#stepSolve');
