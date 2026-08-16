@@ -1,4 +1,6 @@
+import { installAnnotationCanvas } from './annotationCanvas';
 import { installCellLabels } from './cellLabels';
+import { installCoordinateDisplayNormalization } from './coordinateDisplay';
 import { installPlayGuide } from './playGuide';
 import { SolverWorkerClient } from './solver/workerClient';
 import type { BoardSnapshot, DeductionResult } from './solver/types';
@@ -28,6 +30,8 @@ if (!bridge) throw new Error('NQueens legacy UI bridge was not initialized');
 const app: NQueensBridge = bridge;
 installCellLabels(app);
 installPlayGuide(app);
+installAnnotationCanvas(app);
+installCoordinateDisplayNormalization();
 
 const worker = new SolverWorkerClient();
 const stepButton = document.querySelector<HTMLButtonElement>('#stepSolve');
