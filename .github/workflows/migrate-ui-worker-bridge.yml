@@ -16,26 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Add typed worker bridge to legacy UI
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          p=Path('index.html')
-          s=p.read_text()
-          marker="$('stepSolve').onclick=solveOneStep;$('autoQueen').onclick=autoUntilNextQueen;build()})();</script></body></html>"
-          replacement="""$('stepSolve').onclick=solveOneStep;$('autoQueen').onclick=autoUntilNextQueen;
-window.nqApp={
-  getBoard:()=>({size:N,cells:cells.flat().map(c=>({row:c.row,col:c.col,regionId:c.regionId,state:c.state}))}),
-  isPlayMode:()=>mode==='play',
-  applyDeduction:(result,source)=>{pushAction((source==='auto'?'自動推演：':'推演：')+result.label,result.changes,'logic');render();setStatus(result.label,'info')},
-  showStatus:(message,kind='info')=>setStatus(message,kind),
-  setSolverBusy:(busy)=>{const a=$('stepSolve'),b=$('autoQueen');if(a)a.disabled=busy;if(b)b.disabled=busy}
-};
-build()})();</script><script type=\"module\" src=\"/src/main.ts\"></script></body></html>"""
-          if marker not in s:
-              raise SystemExit('target tail marker not found')
-          p.write_text(s.replace(marker,replacement,1))
-          PY
+      - name: Patch legacy UI
+        run: python scripts/patch_legacy_bridge.py
       - name: Commit bridge
         run: |
           git config user.name 'github-actions[bot]'
