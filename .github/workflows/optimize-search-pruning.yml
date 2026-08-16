@@ -1,0 +1,63 @@
+name: Optimize search pruning
+on:
+  push:
+    paths:
+      - '.github/workflows/optimize-search-pruning.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Improve pruning and Hall allocation behavior
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('index.html')
+          s=p.read_text()
+
+          # Forward checking must ensure every remaining Row, Column and Region still has support.
+          old="function hasForwardSupport(){for(let r=0;r<N;r++){if(assigned[r])continue;let ok=false;for(const c of src[r])if(validCell(c)){ok=true;break}if(!ok)return false}return true}"
+          new="function hasForwardSupport(){let coverCols=usedColsMask,coverRegions=usedRegionsMask;for(let r=0;r<N;r++){if(assigned[r])continue;let rowOk=false;for(const c of src[r])if(validCell(c)){rowOk=true;coverCols|=1<<c.col;coverRegions|=1<<c.regionId}if(!rowOk)return false}const fullMask=(1<<N)-1;return(coverCols&fullMask)===fullMask&&(coverRegions&fullMask)===fullMask}"
+          if old not in s: raise SystemExit('hasForwardSupport marker not found')
+          s=s.replace(old,new,1)
+
+          # Avoid allocating a new array for every Hall combination.
+          old_combo="function eachCombination(items,k,visit){const pick=[];function go(start,left){if(left===0)return visit(pick.slice())===true;for(let i=start;i<=items.length-left;i++){pick.push(items[i]);if(go(i+1,left-1))return true;pick.pop()}return false}return go(0,k)}"
+          new_combo="function eachCombination(items,k,visit){const pick=[];function go(start,left){if(left===0)return visit(pick)===true;for(let i=start;i<=items.length-left;i++){pick.push(items[i]);if(go(i+1,left-1))return true;pick.pop()}return false}return go(0,k)}"
+          if old_combo not in s: raise SystemExit('eachCombination marker not found')
+          s=s.replace(old_combo,new_combo,1)
+
+          # Hall masks are dense numeric indexes, so typed arrays beat Map lookups and reduce GC.
+          s=s.replace("const masks=new Map();for(const i of active){let mask=0;for(const c of unitCells(src,kind,i))if(candidate(c))mask|=1<<c.regionId;masks.set(i,mask)}", "const masks=new Uint32Array(N);for(const i of active){let mask=0;for(const c of unitCells(src,kind,i))if(candidate(c))mask|=1<<c.regionId;masks[i]=mask}",1)
+          s=s.replace("for(const i of units)union|=masks.get(i);", "for(const i of units)union|=masks[i];",1)
+          s=s.replace("const masks=new Map();for(const region of active){let mask=0;for(const c of unitCells(src,'region',region))if(candidate(c))mask|=1<<(kind==='row'?c.row:c.col);masks.set(region,mask)}", "const masks=new Uint32Array(N);for(const region of active){let mask=0;for(const c of unitCells(src,'region',region))if(candidate(c))mask|=1<<(kind==='row'?c.row:c.col);masks[region]=mask}",1)
+          s=s.replace("for(const r of regions)union|=masks.get(r);", "for(const r of regions)union|=masks[r];",1)
+
+          # Proof by contradiction tries the most constrained cells first.
+          old_proof="function proofDeduction(src=cells){const cand=src.flat().filter(c=>isCandidate(c,src));"
+          new_proof="function proofDeduction(src=cells){const snap=solverSnapshot(src),cand=src.flat().filter(c=>isCandidate(c,src));cand.sort((a,b)=>{const sa=snap.rowCandidates[a.row]+snap.colCandidates[a.col]+snap.regionCandidates[a.regionId],sb=snap.rowCandidates[b.row]+snap.colCandidates[b.col]+snap.regionCandidates[b.regionId];return sa-sb});"
+          if old_proof not in s: raise SystemExit('proofDeduction marker not found')
+          s=s.replace(old_proof,new_proof,1)
+
+          p.write_text(s)
+          PY
+      - name: Syntax check
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          s=Path('index.html').read_text()
+          js=re.search(r'<script>(.*)</script>',s,re.S).group(1)
+          Path('/tmp/check.js').write_text(js)
+          PY
+          node --check /tmp/check.js
+      - name: Commit changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git diff --cached --quiet || git commit -m 'perf: prune search and reduce Hall allocations'
+          git push
