@@ -1,20 +1,23 @@
 import { SolverWorkerClient } from './solver/workerClient';
 import type { BoardSnapshot, DeductionResult } from './solver/types';
 
+type NQueensBridge = {
+  getBoard(): BoardSnapshot;
+  isPlayMode(): boolean;
+  applyDeduction(result: DeductionResult, source: 'step' | 'auto'): void;
+  showStatus(message: string, kind?: 'info' | 'warn' | 'bad' | 'ok'): void;
+  setSolverBusy(busy: boolean): void;
+};
+
 declare global {
   interface Window {
-    nqApp?: {
-      getBoard(): BoardSnapshot;
-      isPlayMode(): boolean;
-      applyDeduction(result: DeductionResult, source: 'step' | 'auto'): void;
-      showStatus(message: string, kind?: 'info' | 'warn' | 'bad' | 'ok'): void;
-      setSolverBusy(busy: boolean): void;
-    };
+    nqApp?: NQueensBridge;
   }
 }
 
-const app = window.nqApp;
-if (!app) throw new Error('NQueens legacy UI bridge was not initialized');
+const bridge = window.nqApp;
+if (!bridge) throw new Error('NQueens legacy UI bridge was not initialized');
+const app: NQueensBridge = bridge;
 
 const worker = new SolverWorkerClient();
 const stepButton = document.querySelector<HTMLButtonElement>('#stepSolve');
