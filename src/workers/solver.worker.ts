@@ -1,5 +1,6 @@
 /// <reference lib="webworker" />
 import { SolverEngine } from '../solver/engine';
+import { generateUniquePuzzle } from '../solver/generator';
 import type { CellChange, DeductionResult, WorkerRequest, WorkerResponse } from '../solver/types';
 
 declare const self: DedicatedWorkerGlobalScope;
@@ -38,6 +39,16 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
     if (request.type === 'COUNT_SOLUTIONS') {
       const engine = new SolverEngine(request.board);
       post({ id: request.id, type: 'SOLUTION_COUNT', count: engine.countSolutions(request.limit) });
+      return;
+    }
+
+    if (request.type === 'GENERATE_UNIQUE') {
+      const generated = generateUniquePuzzle(request.size, request.maxAttempts);
+      if (!generated) {
+        post({ id: request.id, type: 'NO_RESULT' });
+        return;
+      }
+      post({ id: request.id, type: 'GENERATED_PUZZLE', board: generated.board, attempts: generated.attempts });
       return;
     }
 
