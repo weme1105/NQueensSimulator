@@ -56,6 +56,8 @@ export function installRegionColors(app: RegionColorBridge): void {
     .region-color-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
     .region-color-reset{padding:6px 9px;font-size:12px}
     .region-color-hint{font-size:12px;color:#806f6f}
+    .cell.nq-marked::after{content:"";position:absolute;inset:0;border-radius:inherit;background:rgba(255,255,255,.55);pointer-events:none;z-index:0}
+    .cell.nq-marked .mark{z-index:1}
   `;
   document.head.appendChild(style);
 
@@ -141,8 +143,12 @@ export function installRegionColors(app: RegionColorBridge): void {
 
     const boardCells = Array.from(board.querySelectorAll<HTMLElement>('.cell'));
     for (let i = 0; i < Math.min(snapshot.cells.length, boardCells.length); i++) {
-      const regionId = snapshot.cells[i].regionId;
-      if (regionId >= 0) boardCells[i].style.background = colors[regionId] ?? DEFAULT_COLORS[regionId % DEFAULT_COLORS.length];
+      const cell = snapshot.cells[i];
+      const element = boardCells[i];
+      if (cell.regionId >= 0) {
+        element.style.background = colors[cell.regionId] ?? DEFAULT_COLORS[cell.regionId % DEFAULT_COLORS.length];
+      }
+      element.classList.toggle('nq-marked', cell.state === 1 || cell.state === 2);
     }
   }
 
@@ -177,6 +183,8 @@ export function installRegionColors(app: RegionColorBridge): void {
   document.querySelector('#play')?.addEventListener('click', scheduleApply);
   document.querySelector('#undo')?.addEventListener('click', scheduleApply);
   document.querySelector('#clear')?.addEventListener('click', scheduleApply);
+  document.querySelector('#stepSolve')?.addEventListener('click', scheduleApply);
+  document.querySelector('#autoQueen')?.addEventListener('click', scheduleApply);
 
   applyColors();
 }
