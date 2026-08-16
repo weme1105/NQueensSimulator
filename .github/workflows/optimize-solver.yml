@@ -18,41 +18,31 @@ jobs:
           p=Path('index.html')
           s=p.read_text()
 
-          # 1) Unique-solution search: bit masks + MRV + forward checking.
           new_count="""function countSolutionsOn(src,limit=2,allowUnassigned=false){if(!allowUnassigned){const b=validateRegions(src);if(!b.ok)return{count:0,basicError:b.msg}}let count=0,firstSolution=null;const placedCols=new Int16Array(N);placedCols.fill(-1);let usedColsMask=0,usedRegionsMask=0;const assigned=new Uint8Array(N);function validCell(c){if(c.regionId<0)return false;const cb=1<<c.col,rb=1<<c.regionId;if(usedColsMask&cb||usedRegionsMask&rb)return false;const r=c.row;if(r>0&&placedCols[r-1]>=0&&Math.abs(placedCols[r-1]-c.col)<=1)return false;if(r+1<N&&placedCols[r+1]>=0&&Math.abs(placedCols[r+1]-c.col)<=1)return false;return true}function candidatesForRow(r){const out=[];for(const c of src[r])if(validCell(c))out.push(c);return out}function hasForwardSupport(){for(let r=0;r<N;r++){if(assigned[r])continue;let ok=false;for(const c of src[r])if(validCell(c)){ok=true;break}if(!ok)return false}return true}function dfs(depth){if(count>=limit)return;if(depth===N){count++;if(!firstSolution)firstSolution=Array.from({length:N},(_,r)=>({row:r,col:placedCols[r]}));return}let bestRow=-1,bestCand=null;for(let r=0;r<N;r++){if(assigned[r])continue;const cand=candidatesForRow(r);if(!cand.length)return;if(bestCand===null||cand.length<bestCand.length){bestRow=r;bestCand=cand;if(cand.length===1)break}}for(const c of bestCand){const cb=1<<c.col,rb=1<<c.regionId;assigned[bestRow]=1;placedCols[bestRow]=c.col;usedColsMask|=cb;usedRegionsMask|=rb;if(hasForwardSupport())dfs(depth+1);usedRegionsMask&=~rb;usedColsMask&=~cb;placedCols[bestRow]=-1;assigned[bestRow]=0;if(count>=limit)break}}dfs(0);return{count,firstSolution}}"""
           s,n=re.subn(r"function countSolutionsOn\(src,limit=2,allowUnassigned=false\)\{.*?\}function countSolutions\(limit=2\)",new_count+"function countSolutions(limit=2)",s,count=1)
           if n!=1: raise SystemExit('countSolutionsOn replace failed')
 
-          # Combination generator used by Hall rules; only examine useful sizes.
-          hall_helpers="""function eachCombination(items,k,visit){const pick=[];function go(start,left){if(left===0)return visit(pick.slice())===true;for(let i=start;i<=items.length-left;i++){pick.push(items[i]);if(go(i+1,left-1))return true;pick.pop()}return false}return go(0,k)}"""
-          if 'function eachCombination(' not in s:
-              s=s.replace('function hallSubsetDeduction(',hall_helpers+'function hallSubsetDeduction(',1)
+          helper="""function eachCombination(items,k,visit){const pick=[];function go(start,left){if(left===0)return visit(pick.slice())===true;for(let i=start;i<=items.length-left;i++){pick.push(items[i]);if(go(i+1,left-1))return true;pick.pop()}return false}return go(0,k)}"""
+          if 'function eachCombination(' not in s:s=s.replace('function hallSubsetDeduction(',helper+'function hallSubsetDeduction(',1)
 
           new_hall="""function hallSubsetDeduction(src,kind,maxSize=5){const active=[];for(let i=0;i<N;i++){const u=unitCells(src,kind,i);if(!u.some(c=>c.state===2))active.push(i)}if(active.length<2)return null;const queens=src.flat().filter(c=>c.state===2),candidate=c=>c.state===0&&!queens.some(q=>queenConflict(c,q));const masks=new Map();for(const i of active){let mask=0;for(const c of unitCells(src,kind,i))if(candidate(c))mask|=1<<c.regionId;masks.set(i,mask)}let found=null;for(let k=2;k<=Math.min(maxSize,active.length);k++){const stop=eachCombination(active,k,units=>{let union=0;for(const i of units)union|=masks.get(i);if(bitCount(union)!==k)return false;const unitSet=new Set(units),regions=new Set();for(let r=0;r<N;r++)if(union&(1<<r))regions.add(r);const affected=src.flat().filter(c=>candidate(c)&&regions.has(c.regionId)&&!unitSet.has(kind==='row'?c.row:c.col));if(!affected.length)return false;const us=units.map(x=>x+1).join(','),rs=[...regions].map(x=>x+1).join(',');found={label:(kind==='row'?'Rows ':'Columns ')+us+' 形成 Hall '+k+' 組，完整對應色塊 ['+rs+']，排除這些色塊在其他'+(kind==='row'?'列':'欄')+'的候選',changes:affected.map(c=>({row:c.row,col:c.col,newState:1}))};return true});if(stop)return found}return null}"""
-          s,n=re.subn(r"function hallSubsetDeduction\(src,kind\).*?function reverseHallRegionDeduction",new_hall+'function reverseHallRegionDeduction',s,count=1)
-          if n!=1: raise SystemExit('hallSubsetDeduction replace failed')
+          s,n=re.subn(r"function hallSubsetDeduction\(src,kind(?:,maxSize=\d+)?\).*?function reverseHallRegionDeduction",new_hall+'function reverseHallRegionDeduction',s,count=1)
+          if n!=1: raise SystemExit('hall replace failed')
 
           new_reverse="""function reverseHallRegionDeduction(src,kind,maxSize=5){const active=[];for(let region=0;region<N;region++){const u=unitCells(src,'region',region);if(!u.some(c=>c.state===2))active.push(region)}if(active.length<2)return null;const queens=src.flat().filter(c=>c.state===2),candidate=c=>c.state===0&&!queens.some(q=>queenConflict(c,q));const masks=new Map();for(const region of active){let mask=0;for(const c of unitCells(src,'region',region))if(candidate(c))mask|=1<<(kind==='row'?c.row:c.col);masks.set(region,mask)}let found=null;for(let k=2;k<=Math.min(maxSize,active.length);k++){const stop=eachCombination(active,k,regions=>{let union=0;for(const r of regions)union|=masks.get(r);if(bitCount(union)!==k)return false;const regionSet=new Set(regions),units=new Set();for(let i=0;i<N;i++)if(union&(1<<i))units.add(i);const affected=src.flat().filter(c=>candidate(c)&&units.has(kind==='row'?c.row:c.col)&&!regionSet.has(c.regionId));if(!affected.length)return false;const rs=regions.map(x=>x+1).join(','),us=[...units].map(x=>x+1).join(',');found={label:'色塊 ['+rs+'] 形成反向 Hall '+k+' 組，完整限制在 '+(kind==='row'?'Rows ':'Columns ')+us+'，排除其中其他色塊候選',changes:affected.map(c=>({row:c.row,col:c.col,newState:1}))};return true});if(stop)return found}return null}"""
           s,n=re.subn(r"function reverseHallRegionDeduction\(src,kind(?:,maxSize=\d+)?\).*?function rowColumnRegionIntersectionDeduction",new_reverse+'function rowColumnRegionIntersectionDeduction',s,count=1)
-          if n!=1: raise SystemExit('reverseHall replace failed')
+          if n!=1: raise SystemExit('reverse Hall replace failed')
 
-          # Full one-step solver: Hall 2..5 only. Larger Hall sets add cost but little practical value.
-          old="return hallSubsetDeduction(src,'row')||hallSubsetDeduction(src,'col')||reverseHallRegionDeduction(src,'row')||reverseHallRegionDeduction(src,'col')||null"
-          new="return hallSubsetDeduction(src,'row',5)||hallSubsetDeduction(src,'col',5)||reverseHallRegionDeduction(src,'row',5)||reverseHallRegionDeduction(src,'col',5)||null"
-          if old in s:s=s.replace(old,new,1)
-          else:
-              s=re.sub(r"return hallSubsetDeduction\(src,'row'(?:,\d+)?\)\|\|hallSubsetDeduction\(src,'col'(?:,\d+)?\)\|\|reverseHallRegionDeduction\(src,'row'(?:,\d+)?\)\|\|reverseHallRegionDeduction\(src,'col'(?:,\d+)?\)\|\|null",new,s,count=1)
+          full="return hallSubsetDeduction(src,'row',5)||hallSubsetDeduction(src,'col',5)||reverseHallRegionDeduction(src,'row',5)||reverseHallRegionDeduction(src,'col',5)||null"
+          s=re.sub(r"return hallSubsetDeduction\(src,'row'(?:,\d+)?\)\|\|hallSubsetDeduction\(src,'col'(?:,\d+)?\)\|\|reverseHallRegionDeduction\(src,'row'(?:,\d+)?\)\|\|reverseHallRegionDeduction\(src,'col'(?:,\d+)?\)\|\|null",full,s,count=1)
 
-          # Auto solver: keep cheap deductions, but include Hall pairs/triples only.
           m=re.search(r"function cheapDirect\(src=cells\)\{.*?return null\}",s)
           if not m: raise SystemExit('cheapDirect not found')
-          cheap=m.group(0)
-          cheap=cheap[:-11]+"return hallSubsetDeduction(src,'row',3)||hallSubsetDeduction(src,'col',3)||reverseHallRegionDeduction(src,'row',3)||reverseHallRegionDeduction(src,'col',3)||null}"
+          cheap=re.sub(r"return null\}$","return hallSubsetDeduction(src,'row',3)||hallSubsetDeduction(src,'col',3)||reverseHallRegionDeduction(src,'row',3)||reverseHallRegionDeduction(src,'col',3)||null}",m.group(0),count=1)
           s=s[:m.start()]+cheap+s[m.end():]
 
-          # Explain the split in the visible mode text.
-          s=s.replace('拖曳從空白/皇冠開始會畫 X；從 X 開始會沿路清除 X，皇冠不受影響。','拖曳從空白/皇冠開始會畫 X；從 X 開始會沿路清除 X，皇冠不受影響。推演一步使用完整規則（Hall 2~5 + 反證）；自動推演使用低成本規則與 Hall 2~3，最多 5 秒。')
-
+          note='拖曳從空白/皇冠開始會畫 X；從 X 開始會沿路清除 X，皇冠不受影響。推演一步使用完整規則（Hall 2~5 + 反證）；自動推演使用低成本規則與 Hall 2~3，最多 5 秒。'
+          s=s.replace('拖曳從空白/皇冠開始會畫 X；從 X 開始會沿路清除 X，皇冠不受影響。',note)
           p.write_text(s)
           PY
       - name: Syntax check
@@ -60,9 +50,7 @@ jobs:
           python - <<'PY'
           import re
           from pathlib import Path
-          s=Path('index.html').read_text()
-          js=re.search(r'<script>(.*)</script>',s,re.S).group(1)
-          Path('/tmp/check.js').write_text(js)
+          s=Path('index.html').read_text(); js=re.search(r'<script>(.*)</script>',s,re.S).group(1); Path('/tmp/check.js').write_text(js)
           PY
           node --check /tmp/check.js
       - name: Commit changes
