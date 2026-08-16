@@ -3,293 +3,50 @@ type AnnotationBridge = {
 };
 
 type Point = { x: number; y: number };
-type Stroke = {
-  type: 'stroke';
-  points: Point[];
-  color: string;
-  opacity: number;
-  width: number;
-  erase: boolean;
-};
-type TextBox = {
-  type: 'text';
-  point: Point;
-  text: string;
-  color: string;
-  opacity: number;
-  fontSize: number;
-};
+type Stroke = { type:'stroke'; points:Point[]; color:string; opacity:number; width:number; erase:boolean };
+type TextBox = { type:'text'; point:Point; text:string; color:string; opacity:number; fontSize:number };
 type Annotation = Stroke | TextBox;
 
 export function installAnnotationCanvas(app: AnnotationBridge): void {
-  const board = document.querySelector<HTMLElement>('#board');
-  const clearPlay = document.querySelector<HTMLButtonElement>('#clear');
-  if (!board || !board.parentElement) return;
+  const board=document.querySelector<HTMLElement>('#board');
+  const history=document.querySelector<HTMLElement>('#history');
+  if(!board||!board.parentElement) return;
 
-  const style = document.createElement('style');
-  style.textContent = `
+  const style=document.createElement('style');
+  style.textContent=`
     .annotation-tools{display:none;flex-direction:column;align-items:stretch;gap:6px;margin:0 0 10px;padding:8px 10px;border:1px solid #eaded8;border-radius:12px;background:#fffaf8;position:relative;z-index:30}
-    body.nq-play-mode .annotation-tools{display:flex}
-    .annotation-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
-    .annotation-tools button{padding:7px 9px}
-    .annotation-tools button.active{outline:3px solid #444;background:#fff}
-    .annotation-tools label{display:flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap}
-    .annotation-tools input[type=color]{width:34px;height:30px;padding:2px;border-radius:7px}
-    .annotation-tools input[type=range]{width:86px;padding:0}
-    .annotation-text{min-width:120px;flex:1 1 180px;max-width:300px;height:31px;padding:4px 8px;border:1px solid #d8cbc6;border-radius:7px;background:#fff}
-    .annotation-wrap{position:relative;width:100%;aspect-ratio:1/1;overflow:visible}
-    .annotation-wrap>.board{position:absolute;inset:0;width:100%;height:100%}
-    .annotation-canvas{position:absolute;z-index:20;pointer-events:none;touch-action:none;border-radius:7px}
-    .annotation-canvas.enabled{pointer-events:auto;cursor:crosshair}
-    @media(max-width:850px){
-      .annotation-tools{gap:5px;padding:6px}
-      .annotation-row{gap:5px}
-      .annotation-tools label{font-size:10px}
-      .annotation-tools input[type=range]{width:68px}
-      .annotation-text{min-width:100px;max-width:none}
-    }
-  `;
-  document.head.appendChild(style);
+    body.nq-play-mode .annotation-tools{display:flex}.annotation-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.annotation-tools button{padding:7px 9px}.annotation-tools button.active{outline:3px solid #444;background:#fff}.annotation-tools label{display:flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap}.annotation-tools input[type=color]{width:34px;height:30px;padding:2px;border-radius:7px}.annotation-tools input[type=range]{width:86px;padding:0}
+    .annotation-wrap{position:relative;width:100%;aspect-ratio:1/1;overflow:visible}.annotation-wrap>.board{position:absolute;inset:0;width:100%;height:100%}.annotation-canvas{position:absolute;z-index:20;pointer-events:none;touch-action:none;border-radius:7px}.annotation-canvas.enabled{pointer-events:auto;cursor:crosshair}
+    .annotation-note{display:none;margin-top:12px;padding-top:10px;border-top:1px solid #eaded8}.annotation-note-title{font-weight:800;margin-bottom:6px}.annotation-note textarea{width:100%;min-height:82px;resize:vertical;padding:9px 10px;border:1px solid #d8cbc6;border-radius:9px;background:#fff;font:inherit;line-height:1.45}.annotation-note-hint{font-size:11px;margin-top:5px;opacity:.72}
+    body.nq-play-mode .annotation-note{display:block}
+    #history{max-height:none;overflow-y:visible}#history.history-scroll{max-height:520px;overflow-y:auto;overscroll-behavior:contain;padding-right:4px}
+    @media(max-width:850px){.annotation-tools{gap:5px;padding:6px}.annotation-row{gap:5px}.annotation-tools label{font-size:10px}.annotation-tools input[type=range]{width:68px}#history.history-scroll{max-height:300px}}
+  `;document.head.appendChild(style);
 
-  const tools = document.createElement('div');
-  tools.className = 'annotation-tools';
-  tools.innerHTML = `
-    <div class="annotation-row annotation-row-primary">
-      <button type="button" class="annotation-toggle">✏️ 畫筆</button>
-      <label>顏色 <input class="annotation-color" type="color" value="#ff2d55"></label>
-      <label>透明度 <input class="annotation-opacity" type="range" min="10" max="100" value="75"><span class="annotation-opacity-value">75%</span></label>
-      <label>粗細 <input class="annotation-width" type="range" min="2" max="30" value="6"><span class="annotation-width-value">6</span></label>
-    </div>
-    <div class="annotation-row annotation-row-secondary">
-      <button type="button" class="annotation-eraser">橡皮擦</button>
-      <button type="button" class="annotation-undo">還原</button>
-      <button type="button" class="annotation-clear">清除</button>
-      <input class="annotation-text" type="text" maxlength="80" placeholder="輸入文字後按「文字框」，再點棋盤位置">
-      <button type="button" class="annotation-text-mode">🔤 文字框</button>
-    </div>
-  `;
+  const tools=document.createElement('div');tools.className='annotation-tools';tools.innerHTML=`
+    <div class="annotation-row"><button type="button" class="annotation-toggle">✏️ 畫筆</button><label>顏色 <input class="annotation-color" type="color" value="#ff2d55"></label><label>透明度 <input class="annotation-opacity" type="range" min="10" max="100" value="75"><span class="annotation-opacity-value">75%</span></label><label>粗細 <input class="annotation-width" type="range" min="2" max="30" value="6"><span class="annotation-width-value">6</span></label></div>
+    <div class="annotation-row"><button type="button" class="annotation-eraser">橡皮擦</button><button type="button" class="annotation-undo">還原</button><button type="button" class="annotation-clear">清除</button></div>`;
+  board.parentElement.insertBefore(tools,board);
 
-  const wrap = document.createElement('div');
-  wrap.className = 'annotation-wrap';
-  board.parentElement.insertBefore(tools, board);
-  board.parentElement.insertBefore(wrap, board);
-  wrap.appendChild(board);
+  const wrap=document.createElement('div');wrap.className='annotation-wrap';board.parentElement.insertBefore(wrap,board);wrap.appendChild(board);
+  const canvas=document.createElement('canvas');canvas.className='annotation-canvas';wrap.appendChild(canvas);const ctx=canvas.getContext('2d')!;
 
-  const canvas = document.createElement('canvas');
-  canvas.className = 'annotation-canvas';
-  wrap.appendChild(canvas);
-  const context = canvas.getContext('2d')!;
+  const note=document.createElement('div');note.className='annotation-note';note.innerHTML=`<div class="annotation-note-title">文字註記</div><textarea class="annotation-text" maxlength="500" placeholder="輸入文字後，點棋盤上的位置即可放上文字"></textarea><div class="annotation-note-hint">有輸入文字時，點一下棋盤會放置文字；清空文字後恢復畫筆操作。</div>`;history?.parentElement?.appendChild(note);
+  const textInput=note.querySelector<HTMLTextAreaElement>('.annotation-text')!;
+  const toggle=tools.querySelector<HTMLButtonElement>('.annotation-toggle')!,color=tools.querySelector<HTMLInputElement>('.annotation-color')!,opacity=tools.querySelector<HTMLInputElement>('.annotation-opacity')!,opacityValue=tools.querySelector<HTMLElement>('.annotation-opacity-value')!,width=tools.querySelector<HTMLInputElement>('.annotation-width')!,widthValue=tools.querySelector<HTMLElement>('.annotation-width-value')!,eraser=tools.querySelector<HTMLButtonElement>('.annotation-eraser')!,undo=tools.querySelector<HTMLButtonElement>('.annotation-undo')!,clear=tools.querySelector<HTMLButtonElement>('.annotation-clear')!;
 
-  const toggle = tools.querySelector<HTMLButtonElement>('.annotation-toggle')!;
-  const color = tools.querySelector<HTMLInputElement>('.annotation-color')!;
-  const opacity = tools.querySelector<HTMLInputElement>('.annotation-opacity')!;
-  const opacityValue = tools.querySelector<HTMLElement>('.annotation-opacity-value')!;
-  const width = tools.querySelector<HTMLInputElement>('.annotation-width')!;
-  const widthValue = tools.querySelector<HTMLElement>('.annotation-width-value')!;
-  const eraser = tools.querySelector<HTMLButtonElement>('.annotation-eraser')!;
-  const undo = tools.querySelector<HTMLButtonElement>('.annotation-undo')!;
-  const clear = tools.querySelector<HTMLButtonElement>('.annotation-clear')!;
-  const textInput = tools.querySelector<HTMLInputElement>('.annotation-text')!;
-  const textModeButton = tools.querySelector<HTMLButtonElement>('.annotation-text-mode')!;
-
-  let enabled = false;
-  let erase = false;
-  let textMode = false;
-  let drawing = false;
-  let activeStroke: Stroke | null = null;
-  const annotations: Annotation[] = [];
-
-  const redraw = (): void => {
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    for (const annotation of annotations) drawAnnotation(annotation);
-    if (activeStroke) drawStroke(activeStroke);
-  };
-
-  const resize = (): void => {
-    const boardRect = board.getBoundingClientRect();
-    const firstCell = board.querySelector<HTMLElement>('.cell');
-    const cellRect = firstCell?.getBoundingClientRect();
-    const extraX = cellRect?.width ?? 0;
-    const extraY = cellRect?.height ?? extraX;
-
-    const cssWidth = boardRect.width + extraX * 2;
-    const cssHeight = boardRect.height + extraY * 2;
-    canvas.style.left = `${-extraX}px`;
-    canvas.style.top = `${-extraY}px`;
-    canvas.style.width = `${cssWidth}px`;
-    canvas.style.height = `${cssHeight}px`;
-
-    const dpr = Math.max(1, window.devicePixelRatio || 1);
-    const nextW = Math.max(1, Math.round(cssWidth * dpr));
-    const nextH = Math.max(1, Math.round(cssHeight * dpr));
-    if (canvas.width === nextW && canvas.height === nextH) return;
-    canvas.width = nextW;
-    canvas.height = nextH;
-    redraw();
-  };
-
-  function drawAnnotation(annotation: Annotation): void {
-    if (annotation.type === 'stroke') drawStroke(annotation);
-    else drawTextBox(annotation);
-  }
-
-  function drawStroke(stroke: Stroke): void {
-    if (stroke.points.length < 2) return;
-    const w = canvas.width;
-    const h = canvas.height;
-    context.save();
-    context.globalCompositeOperation = stroke.erase ? 'destination-out' : 'source-over';
-    context.globalAlpha = stroke.erase ? 1 : stroke.opacity;
-    context.strokeStyle = stroke.color;
-    context.lineWidth = stroke.width * (window.devicePixelRatio || 1);
-    context.lineCap = 'round';
-    context.lineJoin = 'round';
-    context.beginPath();
-    const first = stroke.points[0];
-    context.moveTo(first.x * w, first.y * h);
-    for (let i = 1; i < stroke.points.length; i++) {
-      const p = stroke.points[i];
-      context.lineTo(p.x * w, p.y * h);
-    }
-    context.stroke();
-    context.restore();
-  }
-
-  function drawTextBox(box: TextBox): void {
-    const dpr = Math.max(1, window.devicePixelRatio || 1);
-    const x = box.point.x * canvas.width;
-    const y = box.point.y * canvas.height;
-    const fontPx = box.fontSize * dpr;
-    const paddingX = 8 * dpr;
-    const paddingY = 6 * dpr;
-
-    context.save();
-    context.globalAlpha = box.opacity;
-    context.font = `700 ${fontPx}px sans-serif`;
-    context.textBaseline = 'top';
-    const textWidth = context.measureText(box.text).width;
-    const boxWidth = textWidth + paddingX * 2;
-    const boxHeight = fontPx * 1.25 + paddingY * 2;
-
-    context.fillStyle = 'rgba(255,255,255,.88)';
-    context.strokeStyle = box.color;
-    context.lineWidth = Math.max(2, 2 * dpr);
-    context.fillRect(x, y, boxWidth, boxHeight);
-    context.strokeRect(x, y, boxWidth, boxHeight);
-    context.fillStyle = box.color;
-    context.fillText(box.text, x + paddingX, y + paddingY);
-    context.restore();
-  }
-
-  const pointFromEvent = (event: PointerEvent): Point => {
-    const rect = canvas.getBoundingClientRect();
-    return {
-      x: Math.max(0, Math.min(1, (event.clientX - rect.left) / rect.width)),
-      y: Math.max(0, Math.min(1, (event.clientY - rect.top) / rect.height)),
-    };
-  };
-
-  const syncEnabled = (): void => {
-    if (!app.isPlayMode()) enabled = false;
-    canvas.classList.toggle('enabled', enabled && app.isPlayMode());
-    toggle.classList.toggle('active', enabled && app.isPlayMode() && !textMode);
-    textModeButton.classList.toggle('active', enabled && app.isPlayMode() && textMode);
-    eraser.classList.toggle('active', enabled && app.isPlayMode() && erase && !textMode);
-    toggle.textContent = enabled && app.isPlayMode() && !textMode ? '✏️ 畫筆開啟' : '✏️ 畫筆';
-  };
-
-  toggle.addEventListener('click', () => {
-    if (enabled && !textMode) enabled = false;
-    else {
-      enabled = true;
-      textMode = false;
-      erase = false;
-    }
-    syncEnabled();
-  });
-  eraser.addEventListener('click', () => {
-    enabled = true;
-    textMode = false;
-    erase = !erase;
-    syncEnabled();
-  });
-  textModeButton.addEventListener('click', () => {
-    if (!textInput.value.trim()) {
-      textInput.focus();
-      return;
-    }
-    enabled = true;
-    erase = false;
-    textMode = !textMode;
-    syncEnabled();
-  });
-  opacity.addEventListener('input', () => { opacityValue.textContent = `${opacity.value}%`; });
-  width.addEventListener('input', () => { widthValue.textContent = width.value; });
-  undo.addEventListener('click', () => { annotations.pop(); redraw(); });
-  clear.addEventListener('click', () => { annotations.length = 0; activeStroke = null; redraw(); });
-
-  canvas.addEventListener('pointerdown', (event) => {
-    if (!enabled || !app.isPlayMode()) return;
-    event.preventDefault();
-
-    if (textMode) {
-      const text = textInput.value.trim();
-      if (!text) return;
-      annotations.push({
-        type: 'text',
-        point: pointFromEvent(event),
-        text,
-        color: color.value,
-        opacity: Number(opacity.value) / 100,
-        fontSize: Math.max(12, Number(width.value) * 2 + 8),
-      });
-      redraw();
-      return;
-    }
-
-    drawing = true;
-    canvas.setPointerCapture?.(event.pointerId);
-    activeStroke = {
-      type: 'stroke',
-      points: [pointFromEvent(event)],
-      color: color.value,
-      opacity: Number(opacity.value) / 100,
-      width: Number(width.value),
-      erase,
-    };
-  });
-  canvas.addEventListener('pointermove', (event) => {
-    if (!drawing || !activeStroke) return;
-    event.preventDefault();
-    activeStroke.points.push(pointFromEvent(event));
-    redraw();
-  });
-  const finish = (event: PointerEvent): void => {
-    if (!drawing) return;
-    drawing = false;
-    try { canvas.releasePointerCapture?.(event.pointerId); } catch { /* noop */ }
-    if (activeStroke && activeStroke.points.length > 1) annotations.push(activeStroke);
-    activeStroke = null;
-    redraw();
-  };
-  canvas.addEventListener('pointerup', finish);
-  canvas.addEventListener('pointercancel', finish);
-
-  new ResizeObserver(resize).observe(wrap);
-  new MutationObserver(() => requestAnimationFrame(resize)).observe(board, { childList: true, subtree: true });
-  new MutationObserver(syncEnabled).observe(document.body, { attributes: true, attributeFilter: ['class'] });
-  document.querySelector('#play')?.addEventListener('click', () => requestAnimationFrame(() => { resize(); syncEnabled(); }));
-  document.querySelector('#edit')?.addEventListener('click', () => requestAnimationFrame(syncEnabled));
-  document.querySelector('#new')?.addEventListener('click', () => {
-    annotations.length = 0;
-    activeStroke = null;
-    enabled = false;
-    textMode = false;
-    requestAnimationFrame(resize);
-    redraw();
-    syncEnabled();
-  });
-  clearPlay?.addEventListener('click', () => requestAnimationFrame(redraw));
-  resize();
-  syncEnabled();
+  let enabled=false,erase=false,drawing=false,active:Stroke|null=null;const annotations:Annotation[]=[];
+  const drawStroke=(s:Stroke)=>{if(s.points.length<2)return;ctx.save();ctx.globalCompositeOperation=s.erase?'destination-out':'source-over';ctx.globalAlpha=s.erase?1:s.opacity;ctx.strokeStyle=s.color;ctx.lineWidth=s.width*(devicePixelRatio||1);ctx.lineCap='round';ctx.lineJoin='round';ctx.beginPath();ctx.moveTo(s.points[0].x*canvas.width,s.points[0].y*canvas.height);for(let i=1;i<s.points.length;i++)ctx.lineTo(s.points[i].x*canvas.width,s.points[i].y*canvas.height);ctx.stroke();ctx.restore()};
+  const drawText=(b:TextBox)=>{const d=Math.max(1,devicePixelRatio||1),x=b.point.x*canvas.width,y=b.point.y*canvas.height,f=b.fontSize*d;ctx.save();ctx.globalAlpha=b.opacity;ctx.font=`700 ${f}px sans-serif`;ctx.textBaseline='top';ctx.fillStyle=b.color;ctx.fillText(b.text,x,y);ctx.restore()};
+  const redraw=()=>{ctx.clearRect(0,0,canvas.width,canvas.height);for(const a of annotations)a.type==='stroke'?drawStroke(a):drawText(a);if(active)drawStroke(active)};
+  const resize=()=>{const br=board.getBoundingClientRect(),cr=board.querySelector<HTMLElement>('.cell')?.getBoundingClientRect(),ex=cr?.width??0,ey=cr?.height??ex,w=br.width+ex*2,h=br.height+ey*2;canvas.style.left=`${-ex}px`;canvas.style.top=`${-ey}px`;canvas.style.width=`${w}px`;canvas.style.height=`${h}px`;const d=Math.max(1,devicePixelRatio||1),nw=Math.max(1,Math.round(w*d)),nh=Math.max(1,Math.round(h*d));if(canvas.width!==nw||canvas.height!==nh){canvas.width=nw;canvas.height=nh;redraw()}};
+  const point=(e:PointerEvent):Point=>{const r=canvas.getBoundingClientRect();return{x:Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)),y:Math.max(0,Math.min(1,(e.clientY-r.top)/r.height))}};
+  const sync=()=>{if(!app.isPlayMode())enabled=false;canvas.classList.toggle('enabled',enabled&&app.isPlayMode());toggle.classList.toggle('active',enabled&&app.isPlayMode()&&!erase);eraser.classList.toggle('active',enabled&&app.isPlayMode()&&erase);toggle.textContent=enabled&&app.isPlayMode()&&!erase?'✏️ 畫筆開啟':'✏️ 畫筆'};
+  const updateHistoryScroll=()=>{if(!history)return;requestAnimationFrame(()=>history.classList.toggle('history-scroll',history.scrollHeight>520))};
+  if(history)new MutationObserver(updateHistoryScroll).observe(history,{childList:true,subtree:true,characterData:true});
+  toggle.onclick=()=>{enabled=!enabled;erase=false;sync()};eraser.onclick=()=>{enabled=true;erase=!erase;sync()};opacity.oninput=()=>opacityValue.textContent=`${opacity.value}%`;width.oninput=()=>widthValue.textContent=width.value;undo.onclick=()=>{annotations.pop();redraw()};clear.onclick=()=>{annotations.length=0;active=null;redraw()};
+  canvas.onpointerdown=e=>{if(!enabled||!app.isPlayMode())return;e.preventDefault();const text=textInput.value.trim();if(text){annotations.push({type:'text',point:point(e),text,color:color.value,opacity:+opacity.value/100,fontSize:Math.max(12,+width.value*2+8)});redraw();return}drawing=true;canvas.setPointerCapture?.(e.pointerId);active={type:'stroke',points:[point(e)],color:color.value,opacity:+opacity.value/100,width:+width.value,erase}};
+  canvas.onpointermove=e=>{if(!drawing||!active)return;e.preventDefault();active.points.push(point(e));redraw()};const finish=(e:PointerEvent)=>{if(!drawing)return;drawing=false;try{canvas.releasePointerCapture?.(e.pointerId)}catch{}if(active&&active.points.length>1)annotations.push(active);active=null;redraw()};canvas.onpointerup=finish;canvas.onpointercancel=finish;
+  new ResizeObserver(resize).observe(wrap);new MutationObserver(()=>requestAnimationFrame(resize)).observe(board,{childList:true,subtree:true});new MutationObserver(sync).observe(document.body,{attributes:true,attributeFilter:['class']});document.querySelector('#play')?.addEventListener('click',()=>requestAnimationFrame(()=>{resize();sync();updateHistoryScroll()}));document.querySelector('#edit')?.addEventListener('click',()=>requestAnimationFrame(sync));document.querySelector('#new')?.addEventListener('click',()=>{annotations.length=0;active=null;enabled=false;textInput.value='';requestAnimationFrame(resize);redraw();sync()});
+  resize();sync();updateHistoryScroll();
 }
