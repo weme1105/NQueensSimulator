@@ -12,8 +12,15 @@ export class SolverWorkerClient {
   }
 
   cancel(reason = 'Solver cancelled'): void {
-    this.worker?.terminate();
+    const worker = this.worker;
     this.worker = null;
+    // Detach callbacks before terminate so a late error/message from an old worker
+    // cannot settle a newer request.
+    if (worker) {
+      worker.onmessage = null;
+      worker.onerror = null;
+      worker.terminate();
+    }
     if (this.pendingReject) {
       const reject = this.pendingReject;
       this.pendingReject = null;
@@ -33,7 +40,7 @@ export class SolverWorkerClient {
     return this.requestCount({ id: ++this.sequence, type: 'COUNT_SOLUTIONS', board, limit }, timeoutMs);
   }
 
-  generateUnique(size: number, maxAttempts = 150, timeoutMs = 15000): Promise<GeneratedPuzzleResult | null> {
+  generateUnique(size: number, maxAttempts = 150, timeoutMs = 10000): Promise<GeneratedPuzzleResult | null> {
     return this.dispatch({ id: ++this.sequence, type: 'GENERATE_UNIQUE', size, maxAttempts }, timeoutMs, (response) => {
       if (response.type === 'GENERATED_PUZZLE') return { board: response.board, attempts: response.attempts };
       if (response.type === 'NO_RESULT') return null;
@@ -67,32 +74,40 @@ export class SolverWorkerClient {
     return new Promise<T>((resolve, reject) => {
       this.pendingReject = reject;
       let timer: number | undefined;
+      let settled = false;
+
       const settle = (fn: () => void) => {
+        if (settled) return;
+        settled = true;
         if (timer !== undefined) window.clearTimeout(timer);
-        this.pendingReject = null;
+        worker.onmessage = null;
+        worker.onerror = null;
+        if (this.worker === worker) {
+          this.worker = null;
+          this.pendingReject = null;
+        }
         worker.terminate();
-        if (this.worker === worker) this.worker = null;
         fn();
       };
 
       if (timeoutMs !== undefined) {
         timer = window.setTimeout(() => {
           if (this.worker !== worker) return;
-          this.worker = null;
-          this.pendingReject = null;
-          worker.terminate();
-          reject(new Error(`Solver timeout after ${timeoutMs}ms`));
+          settle(() => reject(new Error(`Solver timeout after ${timeoutMs}ms`)));
         }, timeoutMs);
       }
 
       worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
-        if (event.data.id !== request.id) return;
+        if (event.data.id !== request.id || this.worker !== worker) return;
         settle(() => {
           try { resolve(map(event.data)); }
           catch (error) { reject(error); }
         });
       };
-      worker.onerror = (event) => settle(() => reject(new Error(event.message || 'Solver worker failed')));
+      worker.onerror = (event) => {
+        if (this.worker !== worker) return;
+        settle(() => reject(new Error(event.message || 'Solver worker failed')));
+      };
       worker.postMessage(request);
     });
   }
