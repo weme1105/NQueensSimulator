@@ -67,7 +67,7 @@ export function installCellLabels(app: LabelBridge): void {
 
       const coordinate = document.createElement('span');
       coordinate.className = 'cell-coordinate';
-      coordinate.textContent = `${row + 1},${col + 1}`;
+      coordinate.textContent = `C${col + 1}R${row + 1}`;
 
       element.append(region, coordinate);
     }
