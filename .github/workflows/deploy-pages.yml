@@ -31,6 +31,18 @@ jobs:
         run: npm test
       - name: Build
         run: npm run build
+      - name: Fix X tap versus drag behavior
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('dist/index.html')
+          s = p.read_text(encoding='utf-8')
+          old = "}else dragPlayCell(hit.row,hit.col)});"
+          new = "}else if(pointerMoved)dragPlayCell(hit.row,hit.col)});"
+          if old not in s:
+              raise SystemExit('target pointermove code not found')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+          PY
       - name: Copy favicon into Pages artifact
         run: cp favicon.svg dist/favicon.svg
       - name: Promote validated DEV UI to production and DEV routes
