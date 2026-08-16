@@ -33,6 +33,8 @@ jobs:
         run: npm run build
       - name: Copy favicon into Pages artifact
         run: cp favicon.svg dist/favicon.svg
+      - name: Copy DEV route into Pages artifact
+        run: cp -R dev dist/dev
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload Pages artifact
