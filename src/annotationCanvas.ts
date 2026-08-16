@@ -24,6 +24,8 @@ export function installAnnotationCanvas(app: AnnotationBridge): void {
   style.textContent=`
     .annotation-tools{display:none;flex-direction:column;align-items:stretch;gap:6px;margin:0 0 10px;padding:8px 10px;border:1px solid #eaded8;border-radius:12px;background:#fffaf8;position:relative;z-index:30}
     body.nq-play-mode .annotation-tools{display:flex}.annotation-row{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.annotation-tools button{padding:7px 9px}.annotation-tools button.active{outline:3px solid #444;background:#fff}.annotation-tools label{display:flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap}.annotation-tools input[type=color]{width:34px;height:30px;padding:2px;border-radius:7px}.annotation-tools input[type=range]{width:86px;padding:0}
+    .annotation-tools #stepSolve,.annotation-tools #autoQueen{display:inline-block!important;margin:0}
+    #solver:empty{display:none!important;margin:0!important}
     .annotation-wrap{position:relative;width:100%;aspect-ratio:1/1;overflow:visible}.annotation-wrap>.board{position:absolute;inset:0;width:100%;height:100%}.annotation-canvas{position:absolute;z-index:20;pointer-events:none;touch-action:none;border-radius:7px}.annotation-canvas.enabled{pointer-events:auto;cursor:crosshair}
     .annotation-note{display:none;margin-top:12px;padding-top:10px;border-top:1px solid #eaded8}.annotation-note-title{font-weight:800;margin-bottom:6px}.annotation-note textarea{width:100%;min-height:110px;resize:vertical;padding:9px 10px;border:1px solid #d8cbc6;border-radius:9px;background:#fff;font:inherit;line-height:1.45}.annotation-note-actions{display:flex;justify-content:flex-end;margin-top:6px}.annotation-note-actions button{padding:7px 12px}.annotation-note-hint{font-size:11px;margin-top:5px;opacity:.72}body.nq-play-mode .annotation-note{display:block}
     .user-note{border-left:4px solid #aa6b6b!important;background:#fff7f3!important;white-space:pre-wrap;word-break:break-word}.user-note::before{content:'說明：';font-weight:800;margin-right:4px}
@@ -32,6 +34,22 @@ export function installAnnotationCanvas(app: AnnotationBridge): void {
   `;document.head.appendChild(style);
 
   const tools=document.createElement('div');tools.className='annotation-tools';tools.innerHTML=`<div class="annotation-row"><button type="button" class="annotation-toggle">✏️ 畫筆</button><label>顏色 <input class="annotation-color" type="color" value="#ff2d55"></label><label>透明度 <input class="annotation-opacity" type="range" min="10" max="100" value="75"><span class="annotation-opacity-value">75%</span></label><label>粗細 <input class="annotation-width" type="range" min="2" max="30" value="6"><span class="annotation-width-value">6</span></label></div><div class="annotation-row"><button type="button" class="annotation-eraser">橡皮擦</button><button type="button" class="annotation-undo">還原</button><button type="button" class="annotation-clear">清除</button></div>`;board.parentElement.insertBefore(tools,board);
+
+  // Keep the existing solver buttons and handlers; only move their DOM position so
+  // frequently used deduction actions sit beside the drawing controls.
+  const actionRow=tools.querySelectorAll<HTMLElement>('.annotation-row')[1];
+  const eraserButton=tools.querySelector<HTMLButtonElement>('.annotation-eraser');
+  const stepSolve=document.querySelector<HTMLButtonElement>('#stepSolve');
+  const autoQueen=document.querySelector<HTMLButtonElement>('#autoQueen');
+  if(actionRow&&eraserButton){
+    let anchor:Element=eraserButton;
+    for(const button of [stepSolve,autoQueen]){
+      if(!button) continue;
+      anchor.insertAdjacentElement('afterend',button);
+      anchor=button;
+    }
+  }
+
   const wrap=document.createElement('div');wrap.className='annotation-wrap';board.parentElement.insertBefore(wrap,board);wrap.appendChild(board);const canvas=document.createElement('canvas');canvas.className='annotation-canvas';wrap.appendChild(canvas);const ctx=canvas.getContext('2d')!;
   const note=document.createElement('div');note.className='annotation-note';note.innerHTML=`<div class="annotation-note-title">說明文字</div><textarea maxlength="2000" placeholder="輸入推演想法、假設或備註……"></textarea><div class="annotation-note-actions"><button type="button" class="annotation-note-submit">加入紀錄</button></div><div class="annotation-note-hint">加入紀錄視同一次操作，會依發生順序加在操作紀錄最後。Ctrl + Enter 也可送出。</div>`;history?.parentElement?.appendChild(note);
   const noteInput=note.querySelector<HTMLTextAreaElement>('textarea')!,noteSubmit=note.querySelector<HTMLButtonElement>('.annotation-note-submit')!;
