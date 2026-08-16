@@ -32,10 +32,10 @@
     body.nq-play-mode #palette,
     body.nq-play-mode .region-color-tools { display:none!important; }
 
-    .dev-rule-tip { display:none; margin:0 0 10px; }
+    .dev-rule-tip { display:none; margin:0; }
     body.nq-play-mode .dev-rule-tip { display:inline-flex; }
     body.nq-play-mode .play-guide:not(.dev-open) { display:none!important; }
-    body.nq-play-mode .play-guide.dev-open { display:grid!important; }
+    body.nq-play-mode .play-guide.dev-open { display:grid!important; width:100%; margin-top:0; }
 
     .dev-play-actions #stepSolve,
     .dev-play-actions #autoQueen { margin:0!important; }
@@ -126,15 +126,14 @@
       const playActions = document.createElement('div');
       playActions.className = 'dev-play-actions';
       annotationTools.insertAdjacentElement('afterend', playActions);
-      playActions.append(undoBtn, clearBtn, stepBtn, autoBtn);
 
       const tipsBtn = document.createElement('button');
       tipsBtn.type = 'button';
       tipsBtn.className = 'dev-rule-tip';
       tipsBtn.textContent = '💡 規則 Tips';
-      playActions.insertAdjacentElement('afterend', tipsBtn);
+      playActions.append(tipsBtn, undoBtn, clearBtn, stepBtn, autoBtn);
       if (guide) {
-        tipsBtn.insertAdjacentElement('afterend', guide);
+        playActions.insertAdjacentElement('afterend', guide);
         guide.classList.remove('dev-open');
         tipsBtn.addEventListener('click', () => guide.classList.toggle('dev-open'));
       }
