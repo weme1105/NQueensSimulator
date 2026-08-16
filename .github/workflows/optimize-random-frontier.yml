@@ -1,0 +1,40 @@
+name: Optimize random frontier
+on:
+  push:
+    paths:
+      - '.github/workflows/optimize-random-frontier.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Use incremental frontier for random region growth
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text()
+          start=s.index('function growUniqueRegions(solution)')
+          end=s.index('async function randomUniquePuzzle()',start)
+          new="""function growUniqueRegions(solution){const work=Array.from({length:N},(_,r)=>Array.from({length:N},(_,c)=>({row:r,col:c,regionId:-1,state:0,conflict:false})));const frontier=new Set();function key(r,c){return r*N+c}function addFrontierAround(r,c){for(const[dr,dc]of[[1,0],[-1,0],[0,1],[0,-1]]){const rr=r+dr,cc=c+dc;if(rr>=0&&cc>=0&&rr<N&&cc<N&&work[rr][cc].regionId<0)frontier.add(key(rr,cc))}}for(let r=0;r<N;r++){work[r][solution[r]].regionId=r}for(let r=0;r<N;r++)addFrontierAround(r,solution[r]);let left=N*N-N;while(left){let options=[];for(const k of frontier){const r=Math.floor(k/N),c=k%N;if(work[r][c].regionId>=0){frontier.delete(k);continue}const neigh=new Set();for(const[dr,dc]of[[1,0],[-1,0],[0,1],[0,-1]]){const rr=r+dr,cc=c+dc;if(rr>=0&&cc>=0&&rr<N&&cc<N&&work[rr][cc].regionId>=0)neigh.add(work[rr][cc].regionId)}for(const rid of neigh)options.push([r,c,rid])}if(!options.length)return null;options=shuffled(options);const valid=[];for(const[r,c,rid]of options){work[r][c].regionId=rid;if(countSolutionsOn(work,2,true).count===1)valid.push([r,c,rid]);work[r][c].regionId=-1;if(valid.length>=8)break}if(!valid.length)return null;const pick=valid[Math.floor(Math.random()*valid.length)],r=pick[0],c=pick[1],rid=pick[2];work[r][c].regionId=rid;frontier.delete(key(r,c));addFrontierAround(r,c);left--}return work}"""
+          s=s[:start]+new+s[end:]
+          p.write_text(s)
+          PY
+      - name: Syntax check
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          s=Path('index.html').read_text()
+          Path('/tmp/check.js').write_text(re.search(r'<script>(.*)</script>',s,re.S).group(1))
+          PY
+          node --check /tmp/check.js
+      - name: Commit changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git diff --cached --quiet || git commit -m 'perf: grow random regions from an incremental frontier'
+          git push
