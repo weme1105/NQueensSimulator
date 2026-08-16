@@ -1,0 +1,41 @@
+name: MRV all constraints
+on:
+  push:
+    paths:
+      - '.github/workflows/mrv-all-constraints.yml'
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Choose the most constrained row column or region
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          p=Path('index.html')
+          s=p.read_text()
+          start=s.index('function countSolutionsOn(src,limit=2,allowUnassigned=false)')
+          end=s.index('function countSolutions(limit=2)',start)
+          new="""function countSolutionsOn(src,limit=2,allowUnassigned=false){if(!allowUnassigned){const b=validateRegions(src);if(!b.ok)return{count:0,basicError:b.msg}}let count=0,firstSolution=null;const placedCols=new Int16Array(N);placedCols.fill(-1);let usedColsMask=0,usedRegionsMask=0;const assigned=new Uint8Array(N),g=geometryFor(src);function validCell(c){if(c.regionId<0||assigned[c.row])return false;const cb=1<<c.col,rb=1<<c.regionId;if(usedColsMask&cb||usedRegionsMask&rb)return false;const r=c.row;if(r>0&&placedCols[r-1]>=0&&Math.abs(placedCols[r-1]-c.col)<=1)return false;if(r+1<N&&placedCols[r+1]>=0&&Math.abs(placedCols[r+1]-c.col)<=1)return false;return true}function chooseBestUnit(){const rowCount=new Uint8Array(N),colCount=new Uint8Array(N),regionCount=new Uint8Array(N);for(let r=0;r<N;r++)for(const c of src[r])if(validCell(c)){rowCount[r]++;colCount[c.col]++;regionCount[c.regionId]++}let best=null,bestCount=N+1;for(let i=0;i<N;i++){if(!assigned[i]){const n=rowCount[i];if(!n)return{dead:true};if(n<bestCount){best={kind:'row',index:i,count:n};bestCount=n}}if(!(usedColsMask&(1<<i))){const n=colCount[i];if(!n)return{dead:true};if(n<bestCount){best={kind:'col',index:i,count:n};bestCount=n}}if(!(usedRegionsMask&(1<<i))){const n=regionCount[i];if(!n)return{dead:true};if(n<bestCount){best={kind:'region',index:i,count:n};bestCount=n}}}return best}function candidatesForUnit(unit){const source=unit.kind==='row'?src[unit.index]:unit.kind==='col'?g.cols[unit.index]:g.regions[unit.index],out=[];for(const c of source)if(validCell(c))out.push(c);return out}function dfs(depth){if(count>=limit)return;if(depth===N){count++;if(!firstSolution)firstSolution=Array.from({length:N},(_,r)=>({row:r,col:placedCols[r]}));return}const unit=chooseBestUnit();if(!unit||unit.dead)return;const cand=candidatesForUnit(unit);for(const c of cand){const cb=1<<c.col,rb=1<<c.regionId,r=c.row;assigned[r]=1;placedCols[r]=c.col;usedColsMask|=cb;usedRegionsMask|=rb;dfs(depth+1);usedRegionsMask&=~rb;usedColsMask&=~cb;placedCols[r]=-1;assigned[r]=0;if(count>=limit)break}}dfs(0);return{count,firstSolution}}"""
+          s=s[:start]+new+s[end:]
+          p.write_text(s)
+          PY
+      - name: Syntax check
+        run: |
+          python - <<'PY'
+          import re
+          from pathlib import Path
+          s=Path('index.html').read_text()
+          Path('/tmp/check.js').write_text(re.search(r'<script>(.*)</script>',s,re.S).group(1))
+          PY
+          node --check /tmp/check.js
+      - name: Commit changes
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git diff --cached --quiet || git commit -m 'perf: use MRV across rows columns and regions'
+          git push
