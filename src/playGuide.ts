@@ -37,7 +37,7 @@ export function installPlayGuide(app: GuideBridge): void {
     body.nq-play-mode #mode{display:none}
     @media(max-width:850px){
       .region-legend{gap:6px}.region-legend-item{width:43px}.region-swatch{height:38px;font-size:15px}
-      .rule-row{grid-template-columns:1fr}.rule-item{padding:7px}.rule-text{font-size:11px}
+      .rule-row{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px}.rule-item{padding:5px;gap:4px}.rule-text{font-size:9px}.rule-text b{font-size:10px}.mini-cell{width:13px;height:13px;font-size:8px}.mini-around{grid-template-columns:repeat(3,13px)}
     }
   `;
   document.head.appendChild(style);
@@ -49,12 +49,12 @@ export function installPlayGuide(app: GuideBridge): void {
       <div class="guide-title">規則說明</div>
       <div class="rule-row">
         <div class="rule-item">
-          <div class="mini-line"><span class="mini-cell">×</span><span class="mini-cell">×</span><span class="mini-cell queen">👑</span><span class="mini-cell">×</span><span class="mini-cell">×</span></div>
-          <div class="rule-text"><b>Row 規則</b>每一列只能有一個皇后</div>
+          <div class="mini-line"><span class="mini-cell">×</span><span class="mini-cell queen">👑</span><span class="mini-cell">×</span></div>
+          <div class="rule-text"><b>Row</b>每列一個皇后</div>
         </div>
         <div class="rule-item">
           <div class="mini-line vertical"><span class="mini-cell">×</span><span class="mini-cell queen">👑</span><span class="mini-cell">×</span></div>
-          <div class="rule-text"><b>Col 規則</b>每一欄只能有一個皇后</div>
+          <div class="rule-text"><b>Col</b>每欄一個皇后</div>
         </div>
         <div class="rule-item">
           <div class="mini-around">
@@ -62,7 +62,7 @@ export function installPlayGuide(app: GuideBridge): void {
             <span class="mini-cell">×</span><span class="mini-cell queen">👑</span><span class="mini-cell">×</span>
             <span class="mini-cell">×</span><span class="mini-cell">×</span><span class="mini-cell">×</span>
           </div>
-          <div class="rule-text"><b>周圍不能接觸</b>皇后周圍 8 格不能有其他皇后</div>
+          <div class="rule-text"><b>不接觸</b>周圍 8 格無皇后</div>
         </div>
       </div>
     </section>
@@ -97,7 +97,7 @@ export function installPlayGuide(app: GuideBridge): void {
       const queen = queensByRegion.get(region);
       item.innerHTML = `
         <div class="region-swatch" style="background:${COLORS[region % COLORS.length]}">${region + 1}</div>
-        <div class="region-queen-coordinate">${queen ? `C${queen.col + 1}R${queen.row + 1}` : ''}</div>
+        <div class="region-queen-coordinate">${queen ? `(${queen.col + 1},${queen.row + 1})` : ''}</div>
       `;
       legend.appendChild(item);
     }
