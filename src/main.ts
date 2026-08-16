@@ -115,7 +115,7 @@ async function generateRandom(): Promise<void> {
   if (randomButton) randomButton.disabled = true;
   app.showStatus(`正在背景產生 ${size}×${size} 隨機唯一題目…`, 'info');
   try {
-    const generated = await worker.generateUnique(size, size >= 11 ? 300 : 180, 20000);
+    const generated = await worker.generateUnique(size, size >= 11 ? 80 : 50, 10000);
     if (!generated) {
       app.showStatus('這次沒有產生成功，請再按一次「隨機唯一題目」。', 'warn');
       return;
@@ -124,7 +124,7 @@ async function generateRandom(): Promise<void> {
     app.showStatus(`✓ 已產生 ${size}×${size} 隨機唯一解題目（第 ${generated.attempts} 次嘗試）。`, 'ok');
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    app.showStatus(message.includes('timeout') ? '隨機題目產生超過 20 秒，已停止背景運算。' : message, message.includes('timeout') ? 'warn' : 'bad');
+    app.showStatus(message.includes('timeout') ? '隨機題目產生超過 10 秒，已停止背景運算。' : message, message.includes('timeout') ? 'warn' : 'bad');
   } finally {
     app.setSolverBusy(false);
     if (randomButton) randomButton.disabled = false;
