@@ -65,10 +65,14 @@ export class SolverEngine {
   }
 
   nextStep(): DeductionResult | null {
+    const bad = this.contradiction();
+    if (bad) throw new Error(`矛盾：${bad}`);
     return this.runPipeline(STEP_PIPELINE);
   }
 
   nextAutoDeduction(): DeductionResult | null {
+    const bad = this.contradiction();
+    if (bad) throw new Error(`矛盾：${bad}`);
     return this.runPipeline(AUTO_PIPELINE);
   }
 
@@ -81,7 +85,7 @@ export class SolverEngine {
       case 'hall-2-3-proof': return this.proof(3, 'hall-2-3-proof');
       case 'hall-4': return this.hallTier(4);
       case 'hall-5': return this.hallTier(5);
-      case 'hall-4-5-proof': return this.proof(5, 'hall-4-5-proof', 4);
+      case 'hall-4-5-proof': return this.proof(5, 'hall-4-5-proof');
     }
   }
 
