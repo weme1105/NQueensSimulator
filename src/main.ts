@@ -1,3 +1,4 @@
+import { installCellLabels } from './cellLabels';
 import { SolverWorkerClient } from './solver/workerClient';
 import type { BoardSnapshot, DeductionResult } from './solver/types';
 
@@ -24,6 +25,7 @@ declare global {
 const bridge = window.nqApp;
 if (!bridge) throw new Error('NQueens legacy UI bridge was not initialized');
 const app: NQueensBridge = bridge;
+installCellLabels(app);
 
 const worker = new SolverWorkerClient();
 const stepButton = document.querySelector<HTMLButtonElement>('#stepSolve');
