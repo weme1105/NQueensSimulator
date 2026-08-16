@@ -9,11 +9,15 @@ if old_live in source:
 
 old_bridge = """  getBoard:()=>({size:N,cells:cells.flat().map(c=>({row:c.row,col:c.col,regionId:c.regionId,state:c.state}))}),
   isPlayMode:()=>mode==='play',
+  validateRegions:()=>validateRegions(),
+  activatePlay:(solutionType)=>{mode='play';buildPlayGeometry();render();setStatus(solutionType==='unique'?'題目驗證通過：唯一解。':'題目可解，但存在多組解。',solutionType==='unique'?'ok':'warn')},
   applyDeduction:"""
 new_bridge = """  getBoard:()=>({size:N,cells:cells.flat().map(c=>({row:c.row,col:c.col,regionId:c.regionId,state:c.state}))}),
+  getSize:()=>Math.max(4,Math.min(20,+$('n').value||8)),
   isPlayMode:()=>mode==='play',
   validateRegions:()=>validateRegions(),
   activatePlay:(solutionType)=>{mode='play';buildPlayGeometry();render();setStatus(solutionType==='unique'?'題目驗證通過：唯一解。':'題目可解，但存在多組解。',solutionType==='unique'?'ok':'warn')},
+  installBoard:(board)=>{N=board.size;$('n').value=N;cells=Array.from({length:N},(_,r)=>Array.from({length:N},(_,c)=>{const x=board.cells.find(v=>v.row===r&&v.col===c);return{row:r,col:c,regionId:x?x.regionId:-1,state:0,conflict:false}}));playGeometry=null;hist=[];opCount=0;selected=0;mode='edit';touchRegions(cells);render()},
   applyDeduction:"""
 if old_bridge in source:
     source = source.replace(old_bridge, new_bridge, 1)
