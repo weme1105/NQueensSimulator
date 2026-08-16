@@ -1,5 +1,7 @@
 import type { BoardSnapshot, DeductionResult, WorkerRequest, WorkerResponse } from './types';
 
+export type GeneratedPuzzleResult = { board: BoardSnapshot; attempts: number };
+
 export class SolverWorkerClient {
   private worker: Worker | null = null;
   private sequence = 0;
@@ -29,6 +31,15 @@ export class SolverWorkerClient {
 
   countSolutions(board: BoardSnapshot, limit = 2, timeoutMs = 5000): Promise<number> {
     return this.requestCount({ id: ++this.sequence, type: 'COUNT_SOLUTIONS', board, limit }, timeoutMs);
+  }
+
+  generateUnique(size: number, maxAttempts = 150, timeoutMs = 15000): Promise<GeneratedPuzzleResult | null> {
+    return this.dispatch({ id: ++this.sequence, type: 'GENERATE_UNIQUE', size, maxAttempts }, timeoutMs, (response) => {
+      if (response.type === 'GENERATED_PUZZLE') return { board: response.board, attempts: response.attempts };
+      if (response.type === 'NO_RESULT') return null;
+      if (response.type === 'ERROR') throw new Error(response.message);
+      throw new Error('Unexpected generator response');
+    });
   }
 
   private request(request: WorkerRequest, timeoutMs?: number): Promise<DeductionResult | null> {
