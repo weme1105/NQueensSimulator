@@ -39,6 +39,8 @@ export function installRegionColors(app: RegionColorBridge): void {
   const board = document.querySelector<HTMLElement>('#board');
   const modeBox = document.querySelector<HTMLElement>('#mode');
   if (!palette || !board || !modeBox) return;
+  const paletteElement = palette;
+  const boardElement = board;
 
   let colors = loadColors();
   let panel: HTMLElement | null = null;
@@ -136,12 +138,12 @@ export function installRegionColors(app: RegionColorBridge): void {
     const snapshot = app.getBoard();
     ensureColorCapacity(snapshot.size);
 
-    const paletteButtons = Array.from(palette.querySelectorAll<HTMLElement>('.colorBtn'));
+    const paletteButtons = Array.from(paletteElement.querySelectorAll<HTMLElement>('.colorBtn'));
     for (let i = 0; i < Math.min(snapshot.size, paletteButtons.length); i++) {
       paletteButtons[i].style.background = colors[i];
     }
 
-    const boardCells = Array.from(board.querySelectorAll<HTMLElement>('.cell'));
+    const boardCells = Array.from(boardElement.querySelectorAll<HTMLElement>('.cell'));
     for (let i = 0; i < Math.min(snapshot.cells.length, boardCells.length); i++) {
       const cell = snapshot.cells[i];
       const element = boardCells[i];
@@ -162,12 +164,12 @@ export function installRegionColors(app: RegionColorBridge): void {
   }
 
   const observer = new MutationObserver(scheduleApply);
-  observer.observe(palette, { childList: true });
-  observer.observe(board, { childList: true });
+  observer.observe(paletteElement, { childList: true });
+  observer.observe(boardElement, { childList: true });
 
   // Legacy UI updates individual cell inline styles while dragging, without rebuilding the board.
   for (const eventName of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) {
-    board.addEventListener(eventName, scheduleApply);
+    boardElement.addEventListener(eventName, scheduleApply);
   }
 
   // N may change after a new board is built; rebuild the editor the next time it is opened.
