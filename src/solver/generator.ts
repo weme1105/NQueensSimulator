@@ -7,33 +7,33 @@ export interface GeneratedPuzzle {
 }
 
 /**
- * Generate a connected-region puzzle with exactly one solution.
+ * Constraint-guided unique puzzle generator.
  *
- * The old generator only created a completely random partition and then
- * rejected it when it was not unique.  That works reasonably well at 8x8,
- * but uniqueness becomes rare at 11x11/12x12.  We now keep the known legal
- * queen layout as immutable region seeds and refine region boundaries when a
- * random partition has multiple solutions.
+ * Invariant:
+ * 1. Start from one known legal queen layout. Each queen is the seed of its region.
+ * 2. Unassigned cells are not playable, so the seed-only board has exactly that solution.
+ * 3. When adding one cell to a region, any newly-created second solution MUST use that
+ *    newly-added cell. We therefore only need to ask whether a complete solution exists
+ *    with a queen forced on that cell, instead of recounting all solutions from scratch.
+ * 4. Reject that region assignment if the forced solution exists. Accepted growth keeps
+ *    the known solution unique by construction.
+ *
+ * This changes generation from random-partition + reject to incremental constraint-guided
+ * construction, which is substantially cheaper for 11x11 and 12x12 boards.
  */
-export function generateUniquePuzzle(size: number, maxAttempts = 150): GeneratedPuzzle | null {
+export function generateUniquePuzzle(size: number, maxAttempts = 80): GeneratedPuzzle | null {
   if (size < 4 || size > 12) throw new Error('隨機唯一題目只支援 4×4 到 12×12。');
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     const queens = randomQueenLayout(size);
     if (!queens) continue;
 
-    const board = growConnectedRegions(size, queens);
+    const board = buildUniqueRegions(size, queens);
     if (!board) continue;
 
-    const directCount = new SolverEngine(board).countSolutions(2);
-    if (directCount === 1) return { board, attempts: attempt };
-
-    // Large boards are much more likely to be multi-solution.  Instead of
-    // throwing the whole partition away, move non-seed boundary cells between
-    // adjacent regions while preserving connectivity.  Prefer mutations that
-    // reduce the number of solutions (capped because we only need a heuristic).
-    const refined = refineToUnique(board, queens, size >= 10 ? 420 : 180);
-    if (refined) return { board: refined, attempts: attempt };
+    // Safety verification only once at the end. The construction itself preserves
+    // uniqueness incrementally, so this is not part of the hot growth loop.
+    if (new SolverEngine(board).countSolutions(2) === 1) return { board, attempts: attempt };
   }
   return null;
 }
@@ -51,8 +51,9 @@ function randomQueenLayout(size: number): number[] | null {
   return null;
 }
 
-function growConnectedRegions(size: number, queens: readonly number[]): BoardSnapshot | null {
+function buildUniqueRegions(size: number, queens: readonly number[]): BoardSnapshot | null {
   const regions = Array.from({ length: size }, () => new Int16Array(size).fill(-1));
+  const regionSizes = new Int16Array(size);
   const frontier = new Set<number>();
   const key = (row: number, col: number) => row * size + col;
 
@@ -63,136 +64,188 @@ function growConnectedRegions(size: number, queens: readonly number[]): BoardSna
     }
   };
 
-  for (let region = 0; region < size; region++) regions[region][queens[region]] = region;
+  // Region id intentionally equals the seed queen's row. This gives us a stable
+  // target solution: row r -> col queens[r] -> region r.
+  for (let region = 0; region < size; region++) {
+    regions[region][queens[region]] = region;
+    regionSizes[region] = 1;
+  }
   for (let region = 0; region < size; region++) addFrontier(region, queens[region]);
 
   let remaining = size * size - size;
   while (remaining > 0) {
-    const choices: Array<[number, number, number, number]> = [];
-    for (const encoded of frontier) {
+    const frontierCells = shuffle(Array.from(frontier));
+    const options: GrowthOption[] = [];
+
+    for (const encoded of frontierCells) {
       const row = Math.floor(encoded / size), col = encoded % size;
-      if (regions[row][col] >= 0) { frontier.delete(encoded); continue; }
+      if (regions[row][col] >= 0) {
+        frontier.delete(encoded);
+        continue;
+      }
+
       const adjacentRegions = new Set<number>();
       for (const [dr, dc] of ORTHOGONAL) {
         const rr = row + dr, cc = col + dc;
-        if (rr >= 0 && cc >= 0 && rr < size && cc < size && regions[rr][cc] >= 0) adjacentRegions.add(regions[rr][cc]);
+        if (rr < 0 || cc < 0 || rr >= size || cc >= size) continue;
+        const region = regions[rr][cc];
+        if (region >= 0) adjacentRegions.add(region);
       }
+
       for (const region of adjacentRegions) {
-        // Mild compactness bias: prefer the seed whose Manhattan distance is
-        // smaller, but retain randomness so repeated clicks produce new boards.
         const distance = Math.abs(row - region) + Math.abs(col - queens[region]);
-        choices.push([row, col, region, distance]);
+        const balance = regionSizes[region];
+        const sameRowPenalty = row === region ? 5 : 0;
+        const sameColPenalty = col === queens[region] ? 3 : 0;
+        const jitter = Math.random() * 3;
+        options.push({
+          row,
+          col,
+          region,
+          score: distance * 3 + balance * 1.5 + sameRowPenalty + sameColPenalty + jitter,
+        });
       }
     }
-    if (!choices.length) return null;
 
-    choices.sort((a, b) => a[3] - b[3]);
-    const pool = choices.slice(0, Math.max(1, Math.ceil(choices.length * 0.35)));
-    const [row, col, region] = pool[Math.floor(Math.random() * pool.length)];
-    regions[row][col] = region;
-    frontier.delete(key(row, col));
-    addFrontier(row, col);
+    if (!options.length) return null;
+    options.sort((a, b) => a.score - b.score);
+
+    // Prefer compact/balanced growth, but inspect a wider low-cost window so a
+    // locally attractive assignment cannot easily trap the remaining frontier.
+    const windowSize = Math.min(options.length, Math.max(18, size * 4));
+    let accepted: GrowthOption | null = null;
+
+    for (let i = 0; i < windowSize; i++) {
+      const option = options[i];
+      regions[option.row][option.col] = option.region;
+
+      // Before this assignment the puzzle has exactly one solution. Therefore a
+      // new second solution can only exist if it uses this newly available cell.
+      const createsAlternative = canCompleteWithForcedQueen(
+        regions,
+        size,
+        option.row,
+        option.col,
+        option.region,
+      );
+
+      if (!createsAlternative) {
+        accepted = option;
+        break;
+      }
+      regions[option.row][option.col] = -1;
+    }
+
+    // If the cheap window is blocked, scan the rest before abandoning this seed.
+    if (!accepted) {
+      for (let i = windowSize; i < options.length; i++) {
+        const option = options[i];
+        regions[option.row][option.col] = option.region;
+        const createsAlternative = canCompleteWithForcedQueen(
+          regions,
+          size,
+          option.row,
+          option.col,
+          option.region,
+        );
+        if (!createsAlternative) {
+          accepted = option;
+          break;
+        }
+        regions[option.row][option.col] = -1;
+      }
+    }
+
+    if (!accepted) return null;
+
+    regionSizes[accepted.region]++;
+    frontier.delete(key(accepted.row, accepted.col));
+    addFrontier(accepted.row, accepted.col);
     remaining--;
   }
 
   return boardFromRegions(regions, size);
 }
 
-function refineToUnique(source: BoardSnapshot, queens: readonly number[], mutationBudget: number): BoardSnapshot | null {
-  const size = source.size;
-  const regions = Array.from({ length: size }, () => new Int16Array(size));
-  for (const cell of source.cells) regions[cell.row][cell.col] = cell.regionId;
-
-  const isSeed = (row: number, col: number) => queens[row] === col;
-  let board = boardFromRegions(regions, size);
-  let score = new SolverEngine(board).countSolutions(24);
-  if (score === 1) return board;
-
-  for (let mutation = 0; mutation < mutationBudget; mutation++) {
-    const candidates: Array<[number, number, number]> = [];
-    for (let row = 0; row < size; row++) for (let col = 0; col < size; col++) {
-      if (isSeed(row, col)) continue;
-      const from = regions[row][col];
-      const neighbors = new Set<number>();
-      for (const [dr, dc] of ORTHOGONAL) {
-        const rr = row + dr, cc = col + dc;
-        if (rr < 0 || cc < 0 || rr >= size || cc >= size) continue;
-        const to = regions[rr][cc];
-        if (to !== from) neighbors.add(to);
-      }
-      for (const to of neighbors) candidates.push([row, col, to]);
-    }
-    if (!candidates.length) break;
-
-    // Try several random boundary moves before spending a solution count.
-    let changed = false;
-    for (let trial = 0; trial < Math.min(32, candidates.length); trial++) {
-      const [row, col, to] = candidates[Math.floor(Math.random() * candidates.length)];
-      const from = regions[row][col];
-      if (from === to || !canRemoveWithoutDisconnect(regions, size, row, col, from)) continue;
-
-      regions[row][col] = to;
-      const nextBoard = boardFromRegions(regions, size);
-      const nextScore = new SolverEngine(nextBoard).countSolutions(24);
-
-      if (nextScore === 1) return nextBoard;
-
-      // Prefer improvements.  Accept a small fraction of equal-score moves to
-      // escape plateaus caused by the capped solution count.
-      if (nextScore > 0 && (nextScore < score || (nextScore === score && Math.random() < 0.12))) {
-        board = nextBoard;
-        score = nextScore;
-        changed = true;
-        break;
-      }
-
-      regions[row][col] = from;
-    }
-
-    if (!changed && mutation % 24 === 23) {
-      // A plateau is a signal to stop refining this partition and let the
-      // outer loop start from another legal queen layout/region growth.
-      break;
-    }
-  }
-  return null;
-}
-
-function canRemoveWithoutDisconnect(
-  regions: readonly Int16Array[], size: number, removeRow: number, removeCol: number, region: number,
+/**
+ * Search for any complete solution containing the newly-added cell as a queen.
+ * Finding one means the assignment creates a second solution and must be rejected.
+ * This is much cheaper than countSolutions(2), because the new cell is forced.
+ */
+function canCompleteWithForcedQueen(
+  regions: readonly Int16Array[],
+  size: number,
+  forcedRow: number,
+  forcedCol: number,
+  forcedRegion: number,
 ): boolean {
-  let start = -1;
-  let total = 0;
-  for (let row = 0; row < size; row++) for (let col = 0; col < size; col++) {
-    if (row === removeRow && col === removeCol) continue;
-    if (regions[row][col] !== region) continue;
-    total++;
-    if (start < 0) start = row * size + col;
-  }
-  if (total === 0) return false;
+  const assignedRows = new Uint8Array(size);
+  const placedCols = new Int16Array(size);
+  placedCols.fill(-1);
 
-  const seen = new Uint8Array(size * size);
-  const queue = new Int16Array(size * size);
-  let head = 0, tail = 0, reached = 0;
-  queue[tail++] = start;
-  seen[start] = 1;
+  assignedRows[forcedRow] = 1;
+  placedCols[forcedRow] = forcedCol;
+  let usedCols = 1 << forcedCol;
+  let usedRegions = 1 << forcedRegion;
 
-  while (head < tail) {
-    const encoded = queue[head++];
-    reached++;
-    const row = Math.floor(encoded / size), col = encoded % size;
-    for (const [dr, dc] of ORTHOGONAL) {
-      const rr = row + dr, cc = col + dc;
-      if (rr < 0 || cc < 0 || rr >= size || cc >= size) continue;
-      if (rr === removeRow && cc === removeCol) continue;
-      const next = rr * size + cc;
-      if (!seen[next] && regions[rr][cc] === region) {
-        seen[next] = 1;
-        queue[tail++] = next;
+  type Candidate = { row: number; col: number; region: number };
+
+  const valid = (row: number, col: number, region: number): boolean => {
+    if (region < 0 || assignedRows[row]) return false;
+    if (usedCols & (1 << col)) return false;
+    if (usedRegions & (1 << region)) return false;
+    if (row > 0 && placedCols[row - 1] >= 0 && Math.abs(placedCols[row - 1] - col) <= 1) return false;
+    if (row + 1 < size && placedCols[row + 1] >= 0 && Math.abs(placedCols[row + 1] - col) <= 1) return false;
+    return true;
+  };
+
+  const candidatesForRow = (row: number): Candidate[] => {
+    const result: Candidate[] = [];
+    for (let col = 0; col < size; col++) {
+      const region = regions[row][col];
+      if (valid(row, col, region)) result.push({ row, col, region });
+    }
+    return result;
+  };
+
+  const chooseRow = (): Candidate[] | null => {
+    let best: Candidate[] | null = null;
+    for (let row = 0; row < size; row++) {
+      if (assignedRows[row]) continue;
+      const candidates = candidatesForRow(row);
+      if (!candidates.length) return [];
+      if (!best || candidates.length < best.length) {
+        best = candidates;
+        if (best.length === 1) break;
       }
     }
-  }
-  return reached === total;
+    return best;
+  };
+
+  const dfs = (depth: number): boolean => {
+    if (depth === size) return true;
+    const candidates = chooseRow();
+    if (!candidates?.length) return false;
+
+    // Low branching first. A little randomization avoids generating identical
+    // shapes without changing correctness.
+    for (const cell of candidates) {
+      assignedRows[cell.row] = 1;
+      placedCols[cell.row] = cell.col;
+      usedCols |= 1 << cell.col;
+      usedRegions |= 1 << cell.region;
+
+      if (dfs(depth + 1)) return true;
+
+      usedRegions &= ~(1 << cell.region);
+      usedCols &= ~(1 << cell.col);
+      placedCols[cell.row] = -1;
+      assignedRows[cell.row] = 0;
+    }
+    return false;
+  };
+
+  return dfs(1);
 }
 
 function boardFromRegions(regions: readonly Int16Array[], size: number): BoardSnapshot {
@@ -202,6 +255,13 @@ function boardFromRegions(regions: readonly Int16Array[], size: number): BoardSn
   }
   return { size, cells };
 }
+
+type GrowthOption = {
+  row: number;
+  col: number;
+  region: number;
+  score: number;
+};
 
 const ORTHOGONAL = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
 
