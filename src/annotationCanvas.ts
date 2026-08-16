@@ -18,16 +18,16 @@ export function installAnnotationCanvas(app: AnnotationBridge): void {
 
   const style = document.createElement('style');
   style.textContent = `
-    .annotation-tools{display:none;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 10px;padding:8px 10px;border:1px solid #eaded8;border-radius:12px;background:#fffaf8}
+    .annotation-tools{display:none;align-items:center;gap:7px;flex-wrap:wrap;margin:0 0 10px;padding:8px 10px;border:1px solid #eaded8;border-radius:12px;background:#fffaf8;position:relative;z-index:30}
     body.nq-play-mode .annotation-tools{display:flex}
     .annotation-tools button{padding:7px 9px}
     .annotation-tools button.active{outline:3px solid #444;background:#fff}
     .annotation-tools label{display:flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap}
     .annotation-tools input[type=color]{width:34px;height:30px;padding:2px;border-radius:7px}
     .annotation-tools input[type=range]{width:86px;padding:0}
-    .annotation-wrap{position:relative;width:100%;aspect-ratio:1/1}
+    .annotation-wrap{position:relative;width:100%;aspect-ratio:1/1;overflow:visible}
     .annotation-wrap>.board{position:absolute;inset:0;width:100%;height:100%}
-    .annotation-canvas{position:absolute;inset:0;width:100%;height:100%;z-index:20;pointer-events:none;touch-action:none;border-radius:7px}
+    .annotation-canvas{position:absolute;z-index:20;pointer-events:none;touch-action:none;border-radius:7px}
     .annotation-canvas.enabled{pointer-events:auto;cursor:crosshair}
     @media(max-width:850px){.annotation-tools{gap:5px;padding:6px}.annotation-tools label{font-size:10px}.annotation-tools input[type=range]{width:68px}}
   `;
@@ -79,10 +79,22 @@ export function installAnnotationCanvas(app: AnnotationBridge): void {
   };
 
   const resize = (): void => {
-    const rect = wrap.getBoundingClientRect();
+    const boardRect = board.getBoundingClientRect();
+    const firstCell = board.querySelector<HTMLElement>('.cell');
+    const cellRect = firstCell?.getBoundingClientRect();
+    const extraX = cellRect?.width ?? 0;
+    const extraY = cellRect?.height ?? extraX;
+
+    const cssWidth = boardRect.width + extraX * 2;
+    const cssHeight = boardRect.height + extraY * 2;
+    canvas.style.left = `${-extraX}px`;
+    canvas.style.top = `${-extraY}px`;
+    canvas.style.width = `${cssWidth}px`;
+    canvas.style.height = `${cssHeight}px`;
+
     const dpr = Math.max(1, window.devicePixelRatio || 1);
-    const nextW = Math.max(1, Math.round(rect.width * dpr));
-    const nextH = Math.max(1, Math.round(rect.height * dpr));
+    const nextW = Math.max(1, Math.round(cssWidth * dpr));
+    const nextH = Math.max(1, Math.round(cssHeight * dpr));
     if (canvas.width === nextW && canvas.height === nextH) return;
     canvas.width = nextW;
     canvas.height = nextH;
@@ -158,13 +170,15 @@ export function installAnnotationCanvas(app: AnnotationBridge): void {
   canvas.addEventListener('pointercancel', finish);
 
   new ResizeObserver(resize).observe(wrap);
+  new MutationObserver(() => requestAnimationFrame(resize)).observe(board, { childList: true, subtree: true });
   new MutationObserver(syncEnabled).observe(document.body, { attributes: true, attributeFilter: ['class'] });
-  document.querySelector('#play')?.addEventListener('click', () => requestAnimationFrame(syncEnabled));
+  document.querySelector('#play')?.addEventListener('click', () => requestAnimationFrame(() => { resize(); syncEnabled(); }));
   document.querySelector('#edit')?.addEventListener('click', () => requestAnimationFrame(syncEnabled));
   document.querySelector('#new')?.addEventListener('click', () => {
     strokes.length = 0;
     activeStroke = null;
     enabled = false;
+    requestAnimationFrame(resize);
     redraw();
     syncEnabled();
   });
