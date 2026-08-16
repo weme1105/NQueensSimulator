@@ -17,6 +17,8 @@ type Snapshot = {
   regionColMask: Uint32Array;
 };
 
+const coord = (row: number, col: number): string => `(${col + 1},${row + 1})`;
+
 export class SolverEngine {
   readonly n: number;
   readonly cells: MutableCell[][];
@@ -165,7 +167,7 @@ export class SolverEngine {
         const r = q.row + dr, c = q.col + dc;
         if (r >= 0 && c >= 0 && r < this.n && c < this.n) add(this.cells[r][c]);
       }
-      if (affected.length) return this.result('basic', `皇后 R${q.row + 1}C${q.col + 1} 排除 ${affected.length} 格`, affected, CellState.Excluded);
+      if (affected.length) return this.result('basic', `皇后 ${coord(q.row, q.col)} 排除 ${affected.length} 格`, affected, CellState.Excluded);
     }
 
     for (const kind of ['row', 'col', 'region'] as const) for (let i = 0; i < this.n; i++) {
@@ -173,7 +175,7 @@ export class SolverEngine {
       const cand = this.unit(kind, i).filter((c) => this.isCandidate(c, snap));
       if (cand.length === 1) {
         const c = cand[0];
-        return { rule: 'basic', label: `${kind} ${i + 1} 只剩唯一候選 R${c.row + 1}C${c.col + 1}`, changes: [{ row: c.row, col: c.col, newState: CellState.Queen }], producesQueen: true };
+        return { rule: 'basic', label: `${kind} ${i + 1} 只剩唯一候選 ${coord(c.row, c.col)}`, changes: [{ row: c.row, col: c.col, newState: CellState.Queen }], producesQueen: true };
       }
     }
 
@@ -193,7 +195,7 @@ export class SolverEngine {
           if (snap.colQueens[c] || snap.colRegionMask[c] !== (1 << region)) continue;
           const cell = this.cells[r][c];
           if (cell.regionId === region && this.isCandidate(cell, snap)) {
-            return { rule: 'basic', label: `Row ${r + 1} 與 Column ${c + 1} 都被 Region ${region + 1} 包覆，交叉點必為皇后`, changes: [{ row: r, col: c, newState: CellState.Queen }], producesQueen: true };
+            return { rule: 'basic', label: `Row ${r + 1} 與 Column ${c + 1} 都被 Region ${region + 1} 包覆，交叉點 ${coord(r, c)} 必為皇后`, changes: [{ row: r, col: c, newState: CellState.Queen }], producesQueen: true };
           }
         }
       }
@@ -280,7 +282,7 @@ export class SolverEngine {
         const newState = assumed === CellState.Queen ? CellState.Excluded : CellState.Queen;
         return {
           rule,
-          label: `反證：假設 R${cell.row + 1}C${cell.col + 1} ${assumed === CellState.Queen ? '是皇后' : '是 X'} 會造成「${contradiction}」`,
+          label: `反證：假設 ${coord(cell.row, cell.col)} ${assumed === CellState.Queen ? '是皇后' : '是 X'} 會造成「${contradiction}」`,
           changes: [{ row: cell.row, col: cell.col, newState }],
           producesQueen: newState === CellState.Queen,
         };
