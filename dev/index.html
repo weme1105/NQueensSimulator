@@ -24,8 +24,8 @@
       return;
     }
 
-    // 已經是 X：只有同一格在 1 秒內的第二次點擊才能升成皇后。
-    // 超時或從別格切過來時，X 保留，這次點擊改成新的 1 秒判定起點。
+    // X 在建立後 1 秒內再次點同一格 => 皇后。
+    // 其他情況單點既有 X => 清空。
     if(x.state===1){
       if(same){
         x.state=2;
@@ -38,11 +38,13 @@
         touchState(cells);validateQueens();render();
         return;
       }
-      cycleCell.pending={row:r,col:c,started:now,entry:null};
+      cycleCell.pending=null;
+      pushAction('手動清除 X：('+(c+1)+','+(r+1)+')',[{row:r,col:c,newState:0}]);
+      render();
       return;
     }
 
-    // 空白格第一次點擊：立即成為正常 X，並開始 1 秒雙擊判定。
+    // 空白格第一次點擊：立即成為 X，並開始 1 秒雙擊判定。
     pushAction('手動 X：('+(c+1)+','+(r+1)+')',[{row:r,col:c,newState:1}]);
     render();
     cycleCell.pending={row:r,col:c,started:Date.now(),entry:hist[hist.length-1]};
@@ -105,7 +107,7 @@
       operationTip.type='button'; operationTip.className='dev-operation-tip'; operationTip.textContent='💡 操作 Tips';
       const operationPanel=document.createElement('div');
       operationPanel.className='dev-operation-panel';
-      operationPanel.innerHTML='<b>操作說明</b><div>單點空白格：標記 X。</div><div>同一格 1 秒內連點兩下：放置皇后。</div><div>超過 1 秒：X 保留，不會取消。</div><div>改點其他格：原本的 X 保留，新格重新開始 1 秒判定。</div><div>單點皇后：清空該格。</div><div>拖曳空白格：連續畫 X；從 X 開始拖曳：連續清除 X。</div>';
+      operationPanel.innerHTML='<b>操作說明</b><div>單點空白格：標記 X。</div><div>同一格 1 秒內連點兩下：放置皇后。</div><div>超過 1 秒後再單點 X：清空該格。</div><div>改點其他空白格：原本的 X 保留，新格重新開始 1 秒判定。</div><div>單點皇后：清空該格。</div><div>拖曳空白格：連續畫 X；從 X 開始拖曳：連續清除 X。</div>';
       toolbar.append(operationTip,operationPanel);
       operationTip.addEventListener('click',()=>operationPanel.classList.toggle('open'));
       document.addEventListener('pointerdown',(event)=>{if(!operationPanel.classList.contains('open'))return;if(operationPanel.contains(event.target)||operationTip.contains(event.target))return;operationPanel.classList.remove('open');});
