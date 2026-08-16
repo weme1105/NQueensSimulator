@@ -54,8 +54,7 @@ export function installAnnotationCanvas(app: AnnotationBridge): void {
   const canvas = document.createElement('canvas');
   canvas.className = 'annotation-canvas';
   wrap.appendChild(canvas);
-  const context = canvas.getContext('2d');
-  if (!context) return;
+  const context = canvas.getContext('2d')!;
 
   const toggle = tools.querySelector<HTMLButtonElement>('.annotation-toggle')!;
   const color = tools.querySelector<HTMLInputElement>('.annotation-color')!;
@@ -73,6 +72,12 @@ export function installAnnotationCanvas(app: AnnotationBridge): void {
   let activeStroke: Stroke | null = null;
   const strokes: Stroke[] = [];
 
+  const redraw = (): void => {
+    context.clearRect(0, 0, canvas.width, canvas.height);
+    for (const stroke of strokes) drawStroke(stroke);
+    if (activeStroke) drawStroke(activeStroke);
+  };
+
   const resize = (): void => {
     const rect = wrap.getBoundingClientRect();
     const dpr = Math.max(1, window.devicePixelRatio || 1);
@@ -84,7 +89,7 @@ export function installAnnotationCanvas(app: AnnotationBridge): void {
     redraw();
   };
 
-  const drawStroke = (stroke: Stroke): void => {
+  function drawStroke(stroke: Stroke): void {
     if (stroke.points.length < 2) return;
     const w = canvas.width;
     const h = canvas.height;
@@ -104,12 +109,6 @@ export function installAnnotationCanvas(app: AnnotationBridge): void {
     }
     context.stroke();
     context.restore();
-  };
-
-  function redraw(): void {
-    context.clearRect(0, 0, canvas.width, canvas.height);
-    for (const stroke of strokes) drawStroke(stroke);
-    if (activeStroke) drawStroke(activeStroke);
   }
 
   const pointFromEvent = (event: PointerEvent): Point => {
@@ -127,14 +126,8 @@ export function installAnnotationCanvas(app: AnnotationBridge): void {
     toggle.textContent = enabled && app.isPlayMode() ? '✏️ 畫筆開啟' : '✏️ 畫筆';
   };
 
-  toggle.addEventListener('click', () => {
-    enabled = !enabled;
-    syncEnabled();
-  });
-  eraser.addEventListener('click', () => {
-    erase = !erase;
-    eraser.classList.toggle('active', erase);
-  });
+  toggle.addEventListener('click', () => { enabled = !enabled; syncEnabled(); });
+  eraser.addEventListener('click', () => { erase = !erase; eraser.classList.toggle('active', erase); });
   opacity.addEventListener('input', () => { opacityValue.textContent = `${opacity.value}%`; });
   width.addEventListener('input', () => { widthValue.textContent = width.value; });
   undo.addEventListener('click', () => { strokes.pop(); redraw(); });
@@ -145,13 +138,7 @@ export function installAnnotationCanvas(app: AnnotationBridge): void {
     event.preventDefault();
     drawing = true;
     canvas.setPointerCapture?.(event.pointerId);
-    activeStroke = {
-      points: [pointFromEvent(event)],
-      color: color.value,
-      opacity: Number(opacity.value) / 100,
-      width: Number(width.value),
-      erase,
-    };
+    activeStroke = { points: [pointFromEvent(event)], color: color.value, opacity: Number(opacity.value) / 100, width: Number(width.value), erase };
   });
   canvas.addEventListener('pointermove', (event) => {
     if (!drawing || !activeStroke) return;
@@ -171,8 +158,7 @@ export function installAnnotationCanvas(app: AnnotationBridge): void {
   canvas.addEventListener('pointercancel', finish);
 
   new ResizeObserver(resize).observe(wrap);
-  const modeObserver = new MutationObserver(syncEnabled);
-  modeObserver.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  new MutationObserver(syncEnabled).observe(document.body, { attributes: true, attributeFilter: ['class'] });
   document.querySelector('#play')?.addEventListener('click', () => requestAnimationFrame(syncEnabled));
   document.querySelector('#edit')?.addEventListener('click', () => requestAnimationFrame(syncEnabled));
   document.querySelector('#new')?.addEventListener('click', () => {
