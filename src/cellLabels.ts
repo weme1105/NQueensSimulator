@@ -36,9 +36,17 @@ export function installCellLabels(app: LabelBridge): void {
       font-weight: 600;
       opacity: .9;
     }
+    .cell.region-edge-top { border-top: 4px solid #111 !important; }
+    .cell.region-edge-right { border-right: 4px solid #111 !important; }
+    .cell.region-edge-bottom { border-bottom: 4px solid #111 !important; }
+    .cell.region-edge-left { border-left: 4px solid #111 !important; }
     @media (max-width: 850px) {
       .cell .region-number { font-size: clamp(9px, 3.4vw, 17px); }
       .cell .cell-coordinate { bottom: 3px; font-size: clamp(6px, 2.15vw, 10px); }
+      .cell.region-edge-top { border-top-width: 3px !important; }
+      .cell.region-edge-right { border-right-width: 3px !important; }
+      .cell.region-edge-bottom { border-bottom-width: 3px !important; }
+      .cell.region-edge-left { border-left-width: 3px !important; }
     }
   `;
   document.head.appendChild(style);
@@ -57,6 +65,18 @@ export function installCellLabels(app: LabelBridge): void {
 
       element.querySelector('.region-number')?.remove();
       element.querySelector('.cell-coordinate')?.remove();
+      element.classList.remove('region-edge-top', 'region-edge-right', 'region-edge-bottom', 'region-edge-left');
+
+      if (cell.regionId >= 0) {
+        const different = (r: number, c: number): boolean => {
+          const neighbor = byKey.get(`${r},${c}`);
+          return !neighbor || neighbor.regionId !== cell.regionId;
+        };
+        if (different(row - 1, col)) element.classList.add('region-edge-top');
+        if (different(row, col + 1)) element.classList.add('region-edge-right');
+        if (different(row + 1, col)) element.classList.add('region-edge-bottom');
+        if (different(row, col - 1)) element.classList.add('region-edge-left');
+      }
 
       if (!app.isPlayMode() || cell.state !== 0 || cell.regionId < 0) continue;
 
