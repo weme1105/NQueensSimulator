@@ -21,4 +21,10 @@ Standard flow:
 4. Deploy the resulting artifact without changing application HTML/JS/CSS after build.
 5. Verify the deployed SHA from the version file.
 
+Deployment verification:
+
+- Production push deployments are pinned to the triggering `github.sha`.
+- Manual deployments may specify an explicit target SHA.
+- The workflow verifies the checked-out production SHA before test/build/deploy.
+
 Future changes should be validated on `develop` first and promoted to `main` only after DEV verification.
