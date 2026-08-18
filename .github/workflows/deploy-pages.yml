@@ -5,6 +5,11 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      target_sha:
+        description: 'Optional main commit SHA to deploy. Leave blank to deploy current main.'
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -20,11 +25,42 @@ jobs:
   build-site:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout PROD source from main
+      - name: Resolve PROD source ref
+        id: prod
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PUSH_SHA: ${{ github.sha }}
+          TARGET_SHA: ${{ inputs.target_sha }}
+        run: |
+          if [ "$EVENT_NAME" = "push" ]; then
+            REF="$PUSH_SHA"
+          elif [ -n "$TARGET_SHA" ]; then
+            REF="$TARGET_SHA"
+          else
+            REF="main"
+          fi
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+          echo "Deploying PROD source ref: $REF"
+
+      - name: Checkout PROD source
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: ${{ steps.prod.outputs.ref }}
           path: prod-src
+
+      - name: Verify PROD checkout
+        env:
+          EXPECTED_REF: ${{ steps.prod.outputs.ref }}
+        run: |
+          ACTUAL_SHA="$(git -C prod-src rev-parse HEAD)"
+          echo "Resolved PROD SHA: $ACTUAL_SHA"
+          if [ "$EXPECTED_REF" != "main" ]; then
+            EXPECTED_SHA="$(git -C prod-src rev-parse "$EXPECTED_REF^{commit}")"
+            if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
+              echo "PROD checkout mismatch: expected $EXPECTED_SHA, got $ACTUAL_SHA"
+              exit 1
+            fi
+          fi
 
       - name: Detect active develop branch
         id: dev
