@@ -77,6 +77,11 @@ jobs:
               p.write_text(s.replace(old, new, 1), encoding='utf-8')
           PY
 
+      - name: Apply DEV source interaction contract
+        if: steps.dev.outputs.exists == 'true'
+        working-directory: dev-src
+        run: python scripts/apply-dev-source-contract.py
+
       - name: Install DEV dependencies
         if: steps.dev.outputs.exists == 'true'
         working-directory: dev-src
@@ -91,46 +96,6 @@ jobs:
         if: steps.dev.outputs.exists == 'true'
         working-directory: dev-src
         run: npm run build
-
-      - name: Enforce DEV edit interaction contract
-        if: steps.dev.outputs.exists == 'true'
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('dev-src/dist/index.html')
-          s = p.read_text(encoding='utf-8')
-
-          old_paint = "function paintRegionCell(r,c,toggle=false){const x=cells[r][c];if(selected===-1){if(removeColor(x))updateCellVisual(r,c);return}if(toggle&&x.regionId===selected){if(removeColor(x))updateCellVisual(r,c);return}if(x.regionId===selected)return;if(!canPaint(x,selected)){setStatus('同一顏色必須上下左右相連。','bad');return}const old=x.regionId;x.regionId=selected;if(old>=0&&!isRegionConnected(old)){x.regionId=old;setStatus('不能改色：會讓原本色塊斷開。','bad');return}touchRegions(cells);updateCellVisual(r,c)}"
-          new_paint = "function paintRegionCell(r,c,allowOverwrite=false){const x=cells[r][c];if(selected===-1){if(!allowOverwrite||x.regionId<0)return;x.regionId=-1;touchRegions(cells);updateCellVisual(r,c);return}if(!allowOverwrite&&x.regionId>=0)return;if(x.regionId===selected)return;x.regionId=selected;touchRegions(cells);updateCellVisual(r,c)}"
-          if old_paint not in s:
-              raise SystemExit('DEV paintRegionCell target not found')
-          s = s.replace(old_paint, new_paint, 1)
-
-          old_jitter = "}else dragPlayCell(hit.row,hit.col)});"
-          new_jitter = "}else if(pointerMoved)dragPlayCell(hit.row,hit.col)});"
-          if old_jitter in s:
-              s = s.replace(old_jitter, new_jitter, 1)
-
-          old_down = "if(mode==='edit'){if(selected===-1)paintRegionCell(hit.row,hit.col,false);else if(cells[hit.row][hit.col].regionId!==selected)paintRegionCell(hit.row,hit.col,false)}else playDragMode=pointerStart.originalState===1?'eraseX':'paintX'"
-          new_down = "if(mode==='edit'){}else playDragMode=pointerStart.originalState===1?'eraseX':'paintX'"
-          if old_down not in s:
-              raise SystemExit('DEV edit pointerdown target not found')
-          s = s.replace(old_down, new_down, 1)
-
-          old_move = "if(key!==startKey&&!pointerMoved){pointerMoved=true;if(mode==='play')dragPlayCell(pointerStart.row,pointerStart.col)}if(mode==='edit'){if(!visited.has(key)){visited.add(key);paintRegionCell(hit.row,hit.col,false)}}else dragPlayCell(hit.row,hit.col)"
-          new_move = "if(key!==startKey&&!pointerMoved){pointerMoved=true;if(mode==='edit'){const sk=pointerStart.row+','+pointerStart.col;visited.add(sk);paintRegionCell(pointerStart.row,pointerStart.col,false)}else dragPlayCell(pointerStart.row,pointerStart.col)}if(mode==='edit'){if(!visited.has(key)){visited.add(key);paintRegionCell(hit.row,hit.col,false)}}else dragPlayCell(hit.row,hit.col)"
-          if old_move not in s:
-              raise SystemExit('DEV edit pointermove target not found')
-          s = s.replace(old_move, new_move, 1)
-
-          old_up = "if(mode==='edit'){if(selected!==-1&&pointerStart.originalRegion===selected)paintRegionCell(hit.row,hit.col,true)}else cycleCell(hit.row,hit.col)"
-          new_up = "if(mode==='edit'){paintRegionCell(hit.row,hit.col,true)}else cycleCell(hit.row,hit.col)"
-          if old_up not in s:
-              raise SystemExit('DEV edit pointerup target not found')
-          s = s.replace(old_up, new_up, 1)
-
-          p.write_text(s, encoding='utf-8')
-          PY
 
       - name: Compose PROD site
         run: |
