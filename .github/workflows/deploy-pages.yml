@@ -65,18 +65,6 @@ jobs:
         working-directory: prod-src
         run: npm run build
 
-      - name: Apply legacy production pointer fix
-        run: |
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('prod-src/dist/index.html')
-          s = p.read_text(encoding='utf-8')
-          old = "}else dragPlayCell(hit.row,hit.col)});"
-          new = "}else if(pointerMoved)dragPlayCell(hit.row,hit.col)});"
-          if old in s:
-              p.write_text(s.replace(old, new, 1), encoding='utf-8')
-          PY
-
       - name: Install DEV dependencies
         if: steps.dev.outputs.exists == 'true'
         working-directory: dev-src
