@@ -4,11 +4,16 @@ on:
   push:
     branches:
       - main
-      - develop
+  workflow_run:
+    workflows:
+      - Build DEV Candidate
+    types:
+      - completed
   workflow_dispatch:
 
 permissions:
   contents: read
+  actions: read
   pages: write
   id-token: write
 
@@ -17,7 +22,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-site:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PROD source from main
@@ -25,64 +31,80 @@ jobs:
         with:
           ref: main
           path: prod-src
-      - name: Checkout DEV source from develop
-        uses: actions/checkout@v4
-        with:
-          ref: develop
-          path: dev-src
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
+
       - name: Install PROD dependencies
         working-directory: prod-src
         run: npm install
+
       - name: Test PROD
         working-directory: prod-src
         run: npm test
+
       - name: Build PROD
         working-directory: prod-src
         run: npm run build
-      - name: Install DEV dependencies
-        working-directory: dev-src
-        run: npm install
-      - name: Test DEV
-        working-directory: dev-src
-        run: npm test
-      - name: Build DEV
-        working-directory: dev-src
-        run: npm run build
-      - name: Apply shared pointer fix to both builds
+
+      - name: Apply pointer fix to PROD build
         run: |
           python - <<'PY'
           from pathlib import Path
-          for name in ('prod-src', 'dev-src'):
-              p = Path(name) / 'dist' / 'index.html'
-              s = p.read_text(encoding='utf-8')
-              old = "}else dragPlayCell(hit.row,hit.col)});"
-              new = "}else if(pointerMoved)dragPlayCell(hit.row,hit.col)});"
-              if old in s:
-                  p.write_text(s.replace(old, new, 1), encoding='utf-8')
+          p = Path('prod-src/dist/index.html')
+          s = p.read_text(encoding='utf-8')
+          old = "}else dragPlayCell(hit.row,hit.col)});"
+          new = "}else if(pointerMoved)dragPlayCell(hit.row,hit.col)});"
+          if old in s:
+              p.write_text(s.replace(old, new, 1), encoding='utf-8')
           PY
-      - name: Compose isolated PROD and DEV site
+
+      - name: Compose PROD site
         run: |
           rm -rf site
-          mkdir -p site/dev
+          mkdir -p site
           cp -R prod-src/dist/. site/
           cp prod-src/favicon.svg site/favicon.svg
           cp site/index.html site/base.html
           cp prod-src/dev/index.html site/index.html
           sed -i "s#fetch('../index.html'#fetch('base.html'#" site/index.html
-          cp -R dev-src/dist/. site/dev/
-          cp dev-src/favicon.svg site/dev/favicon.svg
-          cp site/dev/index.html site/dev/base.html
-          cp dev-src/dev/index.html site/dev/index.html
-          sed -i "s#fetch('../index.html'#fetch('base.html'#" site/dev/index.html
-          if [ -f dev-src/dev/changelog.html ]; then cp dev-src/dev/changelog.html site/dev/changelog.html; fi
           if [ -f prod-src/changelog.html ]; then cp prod-src/changelog.html site/changelog.html; fi
-          printf 'PROD_BRANCH=main\nDEV_BRANCH=develop\nPROD_SHA=%s\nDEV_SHA=%s\n' "$(git -C prod-src rev-parse HEAD)" "$(git -C dev-src rev-parse HEAD)" > site/deployment-version.txt
+
+      - name: Download validated DEV build
+        if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@v4
+        with:
+          name: dev-site
+          path: site/dev
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Mirror PROD into DEV when releasing main
+        if: github.event_name != 'workflow_run'
+        run: |
+          rm -rf site/dev
+          mkdir -p site/dev
+          cp -R site/. site/dev-tmp
+          rm -rf site/dev-tmp/dev
+          mv site/dev-tmp site/dev
+
+      - name: Write deployment manifest
+        run: |
+          PROD_SHA="$(git -C prod-src rev-parse HEAD)"
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            DEV_SHA="${{ github.event.workflow_run.head_sha }}"
+            DEV_SOURCE="develop"
+          else
+            DEV_SHA="$PROD_SHA"
+            DEV_SOURCE="main"
+          fi
+          printf 'PROD_BRANCH=main\nPROD_SHA=%s\nDEV_SOURCE=%s\nDEV_SHA=%s\n' "$PROD_SHA" "$DEV_SOURCE" "$DEV_SHA" > site/deployment-version.txt
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
+
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -91,30 +113,35 @@ jobs:
   deploy:
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: ${{ steps.deployment1.outputs.page_url }}
     runs-on: ubuntu-latest
-    needs: build
+    needs: build-site
     steps:
       - name: Deploy to GitHub Pages (attempt 1)
         id: deployment1
         continue-on-error: true
         uses: actions/deploy-pages@v4
+
       - name: Wait before retry 2
         if: steps.deployment1.outcome == 'failure'
         run: sleep 20
+
       - name: Deploy to GitHub Pages (attempt 2)
         id: deployment2
         if: steps.deployment1.outcome == 'failure'
         continue-on-error: true
         uses: actions/deploy-pages@v4
+
       - name: Wait before retry 3
         if: steps.deployment1.outcome == 'failure' && steps.deployment2.outcome == 'failure'
         run: sleep 40
+
       - name: Deploy to GitHub Pages (attempt 3)
         id: deployment3
         if: steps.deployment1.outcome == 'failure' && steps.deployment2.outcome == 'failure'
         continue-on-error: true
         uses: actions/deploy-pages@v4
+
       - name: Fail after three deployment attempts
         if: steps.deployment1.outcome == 'failure' && steps.deployment2.outcome == 'failure' && steps.deployment3.outcome == 'failure'
         run: |
