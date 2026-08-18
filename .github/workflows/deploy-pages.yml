@@ -4,12 +4,13 @@ on:
   push:
     branches:
       - main
-  workflow_run:
-    workflows:
-      - Build DEV Candidate
-    types:
-      - completed
   workflow_dispatch:
+    inputs:
+      publish_dev:
+        description: Publish latest develop under /dev/
+        required: false
+        default: true
+        type: boolean
 
 permissions:
   contents: read
@@ -23,7 +24,6 @@ concurrency:
 
 jobs:
   build-site:
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout PROD source from main
@@ -31,6 +31,13 @@ jobs:
         with:
           ref: main
           path: prod-src
+
+      - name: Checkout DEV source from develop
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_dev
+        uses: actions/checkout@v4
+        with:
+          ref: develop
+          path: dev-src
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -61,6 +68,61 @@ jobs:
               p.write_text(s.replace(old, new, 1), encoding='utf-8')
           PY
 
+      - name: Install DEV dependencies
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_dev
+        working-directory: dev-src
+        run: npm install
+
+      - name: Test DEV
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_dev
+        working-directory: dev-src
+        run: npm test
+
+      - name: Build DEV
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_dev
+        working-directory: dev-src
+        run: npm run build
+
+      - name: Enforce DEV edit interaction contract
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_dev
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('dev-src/dist/index.html')
+          s = p.read_text(encoding='utf-8')
+
+          old_paint = "function paintRegionCell(r,c,toggle=false){const x=cells[r][c];if(selected===-1){if(removeColor(x))updateCellVisual(r,c);return}if(toggle&&x.regionId===selected){if(removeColor(x))updateCellVisual(r,c);return}if(x.regionId===selected)return;if(!canPaint(x,selected)){setStatus('同一顏色必須上下左右相連。','bad');return}const old=x.regionId;x.regionId=selected;if(old>=0&&!isRegionConnected(old)){x.regionId=old;setStatus('不能改色：會讓原本色塊斷開。','bad');return}touchRegions(cells);updateCellVisual(r,c)}"
+          new_paint = "function paintRegionCell(r,c,allowOverwrite=false){const x=cells[r][c];if(selected===-1){if(!allowOverwrite||x.regionId<0)return;x.regionId=-1;touchRegions(cells);updateCellVisual(r,c);return}if(!allowOverwrite&&x.regionId>=0)return;if(x.regionId===selected)return;x.regionId=selected;touchRegions(cells);updateCellVisual(r,c)}"
+          if old_paint not in s:
+              raise SystemExit('DEV paintRegionCell target not found')
+          s = s.replace(old_paint, new_paint, 1)
+
+          old_jitter = "}else dragPlayCell(hit.row,hit.col)});"
+          new_jitter = "}else if(pointerMoved)dragPlayCell(hit.row,hit.col)});"
+          if old_jitter in s:
+              s = s.replace(old_jitter, new_jitter, 1)
+
+          old_down = "if(mode==='edit'){if(selected===-1)paintRegionCell(hit.row,hit.col,false);else if(cells[hit.row][hit.col].regionId!==selected)paintRegionCell(hit.row,hit.col,false)}else playDragMode=pointerStart.originalState===1?'eraseX':'paintX'"
+          new_down = "if(mode==='edit'){}else playDragMode=pointerStart.originalState===1?'eraseX':'paintX'"
+          if old_down not in s:
+              raise SystemExit('DEV edit pointerdown target not found')
+          s = s.replace(old_down, new_down, 1)
+
+          old_move = "if(key!==startKey&&!pointerMoved){pointerMoved=true;if(mode==='play')dragPlayCell(pointerStart.row,pointerStart.col)}if(mode==='edit'){if(!visited.has(key)){visited.add(key);paintRegionCell(hit.row,hit.col,false)}}else dragPlayCell(hit.row,hit.col)"
+          new_move = "if(key!==startKey&&!pointerMoved){pointerMoved=true;if(mode==='edit'){const sk=pointerStart.row+','+pointerStart.col;visited.add(sk);paintRegionCell(pointerStart.row,pointerStart.col,false)}else dragPlayCell(pointerStart.row,pointerStart.col)}if(mode==='edit'){if(!visited.has(key)){visited.add(key);paintRegionCell(hit.row,hit.col,false)}}else dragPlayCell(hit.row,hit.col)"
+          if old_move not in s:
+              raise SystemExit('DEV edit pointermove target not found')
+          s = s.replace(old_move, new_move, 1)
+
+          old_up = "if(mode==='edit'){if(selected!==-1&&pointerStart.originalRegion===selected)paintRegionCell(hit.row,hit.col,true)}else cycleCell(hit.row,hit.col)"
+          new_up = "if(mode==='edit'){paintRegionCell(hit.row,hit.col,true)}else cycleCell(hit.row,hit.col)"
+          if old_up not in s:
+              raise SystemExit('DEV edit pointerup target not found')
+          s = s.replace(old_up, new_up, 1)
+
+          p.write_text(s, encoding='utf-8')
+          PY
+
       - name: Compose PROD site
         run: |
           rm -rf site
@@ -72,17 +134,21 @@ jobs:
           sed -i "s#fetch('../index.html'#fetch('base.html'#" site/index.html
           if [ -f prod-src/changelog.html ]; then cp prod-src/changelog.html site/changelog.html; fi
 
-      - name: Download validated DEV build
-        if: github.event_name == 'workflow_run'
-        uses: actions/download-artifact@v4
-        with:
-          name: dev-site
-          path: site/dev
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          run-id: ${{ github.event.workflow_run.id }}
+      - name: Compose DEV site from develop
+        if: github.event_name == 'workflow_dispatch' && inputs.publish_dev
+        run: |
+          rm -rf site/dev
+          mkdir -p site/dev
+          cp -R dev-src/dist/. site/dev/
+          cp dev-src/favicon.svg site/dev/favicon.svg
+          cp site/dev/index.html site/dev/base.html
+          cp dev-src/dev/index.html site/dev/index.html
+          sed -i "s#fetch('../index.html'#fetch('base.html'#" site/dev/index.html
+          if [ -f dev-src/dev/changelog.html ]; then cp dev-src/dev/changelog.html site/dev/changelog.html; fi
+          printf 'DEV_BRANCH=develop\nDEV_SHA=%s\n' "$(git -C dev-src rev-parse HEAD)" > site/dev/dev-version.txt
 
-      - name: Mirror PROD into DEV when releasing main
-        if: github.event_name != 'workflow_run'
+      - name: Mirror PROD into DEV on normal main release
+        if: github.event_name != 'workflow_dispatch' || !inputs.publish_dev
         run: |
           rm -rf site/dev
           mkdir -p site/dev
@@ -92,12 +158,13 @@ jobs:
           cp prod-src/dev/index.html site/dev/index.html
           sed -i "s#fetch('../index.html'#fetch('base.html'#" site/dev/index.html
           if [ -f prod-src/changelog.html ]; then cp prod-src/changelog.html site/dev/changelog.html; fi
+          printf 'DEV_BRANCH=main\nDEV_SHA=%s\n' "$(git -C prod-src rev-parse HEAD)" > site/dev/dev-version.txt
 
       - name: Write deployment manifest
         run: |
           PROD_SHA="$(git -C prod-src rev-parse HEAD)"
-          if [ "${{ github.event_name }}" = "workflow_run" ]; then
-            DEV_SHA="${{ github.event.workflow_run.head_sha }}"
+          if [ -d dev-src ]; then
+            DEV_SHA="$(git -C dev-src rev-parse HEAD)"
             DEV_SOURCE="develop"
           else
             DEV_SHA="$PROD_SHA"
@@ -124,27 +191,22 @@ jobs:
         id: deployment1
         continue-on-error: true
         uses: actions/deploy-pages@v4
-
       - name: Wait before retry 2
         if: steps.deployment1.outcome == 'failure'
         run: sleep 20
-
       - name: Deploy to GitHub Pages (attempt 2)
         id: deployment2
         if: steps.deployment1.outcome == 'failure'
         continue-on-error: true
         uses: actions/deploy-pages@v4
-
       - name: Wait before retry 3
         if: steps.deployment1.outcome == 'failure' && steps.deployment2.outcome == 'failure'
         run: sleep 40
-
       - name: Deploy to GitHub Pages (attempt 3)
         id: deployment3
         if: steps.deployment1.outcome == 'failure' && steps.deployment2.outcome == 'failure'
         continue-on-error: true
         uses: actions/deploy-pages@v4
-
       - name: Fail after three deployment attempts
         if: steps.deployment1.outcome == 'failure' && steps.deployment2.outcome == 'failure' && steps.deployment3.outcome == 'failure'
         run: |
