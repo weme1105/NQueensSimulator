@@ -113,6 +113,14 @@ jobs:
           cp site/dev/index.html site/dev/base.html
           cp prod-src/dev/index.html site/dev/index.html
           sed -i "s#fetch('../index.html'#fetch('base.html'#" site/dev/index.html
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('site/dev/index.html')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace('<base href=\"../\">', '<base href=\"./\">')
+          s = s.replace('<base href="../">', '<base href="./">')
+          p.write_text(s, encoding='utf-8')
+          PY
           if [ -f dev-src/dev/changelog.html ]; then cp dev-src/dev/changelog.html site/dev/changelog.html; fi
           printf 'DEV_BRANCH=develop\nDEV_SHA=%s\n' "$(git -C dev-src rev-parse HEAD)" > site/dev/dev-version.txt
 
@@ -126,6 +134,14 @@ jobs:
           cp site/dev/index.html site/dev/base.html
           cp prod-src/dev/index.html site/dev/index.html
           sed -i "s#fetch('../index.html'#fetch('base.html'#" site/dev/index.html
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('site/dev/index.html')
+          s = p.read_text(encoding='utf-8')
+          s = s.replace('<base href=\"../\">', '<base href=\"./\">')
+          s = s.replace('<base href="../">', '<base href="./">')
+          p.write_text(s, encoding='utf-8')
+          PY
           if [ -f prod-src/changelog.html ]; then cp prod-src/changelog.html site/dev/changelog.html; fi
           printf 'DEV_BRANCH=main\nDEV_SHA=%s\n' "$(git -C prod-src rev-parse HEAD)" > site/dev/dev-version.txt
 
