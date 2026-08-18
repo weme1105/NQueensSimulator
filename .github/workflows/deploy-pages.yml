@@ -8,7 +8,6 @@ on:
 
 permissions:
   contents: read
-  actions: read
   pages: write
   id-token: write
 
@@ -20,56 +19,30 @@ jobs:
   build-site:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout PROD source from main
+      - name: Checkout main
         uses: actions/checkout@v4
         with:
           ref: main
-          path: prod-src
-
-      - name: Detect active develop branch
-        id: dev
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          if curl -fsS \
-            -H "Accept: application/vnd.github+json" \
-            -H "Authorization: Bearer ${GH_TOKEN}" \
-            -H "X-GitHub-Api-Version: 2022-11-28" \
-            "https://api.github.com/repos/${GITHUB_REPOSITORY}/branches/develop" >/dev/null; then
-            echo "exists=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Checkout DEV source from develop
-        if: steps.dev.outputs.exists == 'true'
-        uses: actions/checkout@v4
-        with:
-          ref: develop
-          path: dev-src
 
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - name: Install PROD dependencies
-        working-directory: prod-src
+      - name: Install dependencies
         run: npm install
 
-      - name: Test PROD
-        working-directory: prod-src
+      - name: Test
         run: npm test
 
-      - name: Build PROD
-        working-directory: prod-src
+      - name: Build
         run: npm run build
 
-      - name: Apply legacy PROD pointer fix
+      - name: Apply legacy production pointer fix
         run: |
           python - <<'PY'
           from pathlib import Path
-          p = Path('prod-src/dist/index.html')
+          p = Path('dist/index.html')
           s = p.read_text(encoding='utf-8')
           old = "}else dragPlayCell(hit.row,hit.col)});"
           new = "}else if(pointerMoved)dragPlayCell(hit.row,hit.col)});"
@@ -77,41 +50,25 @@ jobs:
               p.write_text(s.replace(old, new, 1), encoding='utf-8')
           PY
 
-      - name: Install DEV dependencies
-        if: steps.dev.outputs.exists == 'true'
-        working-directory: dev-src
-        run: npm install
-
-      - name: Test DEV
-        if: steps.dev.outputs.exists == 'true'
-        working-directory: dev-src
-        run: npm test
-
-      - name: Build DEV directly from source
-        if: steps.dev.outputs.exists == 'true'
-        working-directory: dev-src
-        run: npm run build
-
-      - name: Compose PROD site with current production UI shell
+      - name: Compose production site
         run: |
           rm -rf site
           mkdir -p site
-          cp -R prod-src/dist/. site/
-          cp prod-src/favicon.svg site/favicon.svg
+          cp -R dist/. site/
+          cp favicon.svg site/favicon.svg
           cp site/index.html site/base.html
-          cp prod-src/dev/index.html site/index.html
+          cp dev/index.html site/index.html
           sed -i "s#fetch('../index.html'#fetch('base.html'#" site/index.html
-          if [ -f prod-src/changelog.html ]; then cp prod-src/changelog.html site/changelog.html; fi
+          if [ -f changelog.html ]; then cp changelog.html site/changelog.html; fi
 
-      - name: Compose DEV site from develop logic with production UI shell
-        if: steps.dev.outputs.exists == 'true'
+      - name: Mirror production into DEV path
         run: |
           rm -rf site/dev
           mkdir -p site/dev
-          cp -R dev-src/dist/. site/dev/
-          cp prod-src/favicon.svg site/dev/favicon.svg
+          cp -R dist/. site/dev/
+          cp favicon.svg site/dev/favicon.svg
           cp site/dev/index.html site/dev/base.html
-          cp prod-src/dev/index.html site/dev/index.html
+          cp dev/index.html site/dev/index.html
           sed -i "s#fetch('../index.html'#fetch('base.html'#" site/dev/index.html
           python - <<'PY'
           from pathlib import Path
@@ -121,41 +78,13 @@ jobs:
           s = s.replace('<base href="../">', '<base href="./">')
           p.write_text(s, encoding='utf-8')
           PY
-          if [ -f dev-src/dev/changelog.html ]; then cp dev-src/dev/changelog.html site/dev/changelog.html; fi
-          printf 'DEV_BRANCH=develop\nDEV_SHA=%s\n' "$(git -C dev-src rev-parse HEAD)" > site/dev/dev-version.txt
-
-      - name: Mirror PROD into DEV when no develop branch exists
-        if: steps.dev.outputs.exists != 'true'
-        run: |
-          rm -rf site/dev
-          mkdir -p site/dev
-          cp -R prod-src/dist/. site/dev/
-          cp prod-src/favicon.svg site/dev/favicon.svg
-          cp site/dev/index.html site/dev/base.html
-          cp prod-src/dev/index.html site/dev/index.html
-          sed -i "s#fetch('../index.html'#fetch('base.html'#" site/dev/index.html
-          python - <<'PY'
-          from pathlib import Path
-          p = Path('site/dev/index.html')
-          s = p.read_text(encoding='utf-8')
-          s = s.replace('<base href=\"../\">', '<base href=\"./\">')
-          s = s.replace('<base href="../">', '<base href="./">')
-          p.write_text(s, encoding='utf-8')
-          PY
-          if [ -f prod-src/changelog.html ]; then cp prod-src/changelog.html site/dev/changelog.html; fi
-          printf 'DEV_BRANCH=main\nDEV_SHA=%s\n' "$(git -C prod-src rev-parse HEAD)" > site/dev/dev-version.txt
+          if [ -f changelog.html ]; then cp changelog.html site/dev/changelog.html; fi
+          printf 'DEV_BRANCH=main\nDEV_SHA=%s\n' "$(git rev-parse HEAD)" > site/dev/dev-version.txt
 
       - name: Write deployment manifest
         run: |
-          PROD_SHA="$(git -C prod-src rev-parse HEAD)"
-          if [ "${{ steps.dev.outputs.exists }}" = "true" ]; then
-            DEV_SHA="$(git -C dev-src rev-parse HEAD)"
-            DEV_SOURCE="develop"
-          else
-            DEV_SHA="$PROD_SHA"
-            DEV_SOURCE="main"
-          fi
-          printf 'PROD_BRANCH=main\nPROD_SHA=%s\nDEV_SOURCE=%s\nDEV_SHA=%s\n' "$PROD_SHA" "$DEV_SOURCE" "$DEV_SHA" > site/deployment-version.txt
+          SHA="$(git rev-parse HEAD)"
+          printf 'PROD_BRANCH=main\nPROD_SHA=%s\nDEV_SOURCE=main\nDEV_SHA=%s\n' "$SHA" "$SHA" > site/deployment-version.txt
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -176,22 +105,27 @@ jobs:
         id: deployment1
         continue-on-error: true
         uses: actions/deploy-pages@v4
+
       - name: Wait before retry 2
         if: steps.deployment1.outcome == 'failure'
         run: sleep 20
+
       - name: Deploy to GitHub Pages (attempt 2)
         id: deployment2
         if: steps.deployment1.outcome == 'failure'
         continue-on-error: true
         uses: actions/deploy-pages@v4
+
       - name: Wait before retry 3
         if: steps.deployment1.outcome == 'failure' && steps.deployment2.outcome == 'failure'
         run: sleep 40
+
       - name: Deploy to GitHub Pages (attempt 3)
         id: deployment3
         if: steps.deployment1.outcome == 'failure' && steps.deployment2.outcome == 'failure'
         continue-on-error: true
         uses: actions/deploy-pages@v4
+
       - name: Fail after three deployment attempts
         if: steps.deployment1.outcome == 'failure' && steps.deployment2.outcome == 'failure' && steps.deployment3.outcome == 'failure'
         run: |
