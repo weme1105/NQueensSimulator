@@ -65,7 +65,7 @@ jobs:
         working-directory: prod-src
         run: npm run build
 
-      - name: Apply pointer fix to PROD build
+      - name: Apply legacy PROD pointer fix
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -77,11 +77,6 @@ jobs:
               p.write_text(s.replace(old, new, 1), encoding='utf-8')
           PY
 
-      - name: Apply DEV source interaction contract
-        if: steps.dev.outputs.exists == 'true'
-        working-directory: dev-src
-        run: python scripts/apply-dev-source-contract.py
-
       - name: Install DEV dependencies
         if: steps.dev.outputs.exists == 'true'
         working-directory: dev-src
@@ -92,7 +87,7 @@ jobs:
         working-directory: dev-src
         run: npm test
 
-      - name: Build DEV
+      - name: Build DEV directly from source
         if: steps.dev.outputs.exists == 'true'
         working-directory: dev-src
         run: npm run build
