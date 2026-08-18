@@ -25,42 +25,33 @@ jobs:
         with:
           ref: main
           path: prod-src
-
       - name: Checkout DEV source from develop
         uses: actions/checkout@v4
         with:
           ref: develop
           path: dev-src
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
-
       - name: Install PROD dependencies
         working-directory: prod-src
         run: npm install
-
       - name: Test PROD
         working-directory: prod-src
         run: npm test
-
       - name: Build PROD
         working-directory: prod-src
         run: npm run build
-
       - name: Install DEV dependencies
         working-directory: dev-src
         run: npm install
-
       - name: Test DEV
         working-directory: dev-src
         run: npm test
-
       - name: Build DEV
         working-directory: dev-src
         run: npm run build
-
       - name: Apply shared pointer fix to both builds
         run: |
           python - <<'PY'
@@ -73,40 +64,25 @@ jobs:
               if old in s:
                   p.write_text(s.replace(old, new, 1), encoding='utf-8')
           PY
-
       - name: Compose isolated PROD and DEV site
         run: |
           rm -rf site
           mkdir -p site/dev
-
-          # PROD is built only from main.
           cp -R prod-src/dist/. site/
           cp prod-src/favicon.svg site/favicon.svg
           cp site/index.html site/base.html
           cp prod-src/dev/index.html site/index.html
           sed -i "s#fetch('../index.html'#fetch('base.html'#" site/index.html
-
-          # DEV is built only from develop and lives entirely under /dev/.
           cp -R dev-src/dist/. site/dev/
           cp dev-src/favicon.svg site/dev/favicon.svg
           cp site/dev/index.html site/dev/base.html
           cp dev-src/dev/index.html site/dev/index.html
           sed -i "s#fetch('../index.html'#fetch('base.html'#" site/dev/index.html
-
-          if [ -f dev-src/dev/changelog.html ]; then
-            cp dev-src/dev/changelog.html site/dev/changelog.html
-          fi
-          if [ -f prod-src/changelog.html ]; then
-            cp prod-src/changelog.html site/changelog.html
-          fi
-
-          printf 'PROD_BRANCH=main\nDEV_BRANCH=develop\nPROD_SHA=%s\nDEV_SHA=%s\n' \
-            "$(git -C prod-src rev-parse HEAD)" \
-            "$(git -C dev-src rev-parse HEAD)" > site/deployment-version.txt
-
+          if [ -f dev-src/dev/changelog.html ]; then cp dev-src/dev/changelog.html site/dev/changelog.html; fi
+          if [ -f prod-src/changelog.html ]; then cp prod-src/changelog.html site/changelog.html; fi
+          printf 'PROD_BRANCH=main\nDEV_BRANCH=develop\nPROD_SHA=%s\nDEV_SHA=%s\n' "$(git -C prod-src rev-parse HEAD)" "$(git -C dev-src rev-parse HEAD)" > site/deployment-version.txt
       - name: Setup Pages
         uses: actions/configure-pages@v5
-
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
@@ -119,6 +95,28 @@ jobs:
     runs-on: ubuntu-latest
     needs: build
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
+      - name: Deploy to GitHub Pages (attempt 1)
+        id: deployment1
+        continue-on-error: true
         uses: actions/deploy-pages@v4
+      - name: Wait before retry 2
+        if: steps.deployment1.outcome == 'failure'
+        run: sleep 20
+      - name: Deploy to GitHub Pages (attempt 2)
+        id: deployment2
+        if: steps.deployment1.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+      - name: Wait before retry 3
+        if: steps.deployment1.outcome == 'failure' && steps.deployment2.outcome == 'failure'
+        run: sleep 40
+      - name: Deploy to GitHub Pages (attempt 3)
+        id: deployment3
+        if: steps.deployment1.outcome == 'failure' && steps.deployment2.outcome == 'failure'
+        continue-on-error: true
+        uses: actions/deploy-pages@v4
+      - name: Fail after three deployment attempts
+        if: steps.deployment1.outcome == 'failure' && steps.deployment2.outcome == 'failure' && steps.deployment3.outcome == 'failure'
+        run: |
+          echo 'GitHub Pages deployment failed after 3 attempts.'
+          exit 1
