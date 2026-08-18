@@ -6,6 +6,7 @@ import { installFreeRegionEditor } from './freeRegionEditor';
 import { installPlayGuide } from './playGuide';
 import { installRegionColors } from './regionColors';
 import { installSolverButtonLayout } from './solverButtonLayout';
+import { installUiLayout } from './uiLayout';
 import { SolverWorkerClient } from './solver/workerClient';
 import { CellState, type BoardSnapshot, type DeductionResult } from './solver/types';
 
@@ -35,6 +36,7 @@ installCoordinateDisplayNormalization();
 installRegionColors(app);
 installSolverButtonLayout();
 installFreeRegionEditor(app);
+installUiLayout(app);
 const deductionHighlight = installDeductionHighlight();
 
 const worker = new SolverWorkerClient();
