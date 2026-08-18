@@ -1,3 +1,4 @@
+import { installPlayPointerGuard } from './playPointerGuard';
 import type { BoardSnapshot } from './solver/types';
 
 type RegionEditorBridge = {
@@ -10,6 +11,8 @@ type RegionEditorBridge = {
 type CellPosition = { row: number; col: number };
 
 export function installFreeRegionEditor(app: RegionEditorBridge): void {
+  installPlayPointerGuard(app);
+
   const board = document.querySelector<HTMLElement>('#board');
   const palette = document.querySelector<HTMLElement>('#palette');
   if (!board || !palette) return;
