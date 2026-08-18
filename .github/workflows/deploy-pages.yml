@@ -98,9 +98,6 @@ jobs:
           mkdir -p site
           cp -R prod-src/dist/. site/
           cp prod-src/favicon.svg site/favicon.svg
-          cp site/index.html site/base.html
-          cp prod-src/dev/index.html site/index.html
-          sed -i "s#fetch('../index.html'#fetch('base.html'#" site/index.html
           if [ -f prod-src/changelog.html ]; then cp prod-src/changelog.html site/changelog.html; fi
 
       - name: Compose DEV site from develop
@@ -110,9 +107,6 @@ jobs:
           mkdir -p site/dev
           cp -R dev-src/dist/. site/dev/
           cp dev-src/favicon.svg site/dev/favicon.svg
-          cp site/dev/index.html site/dev/base.html
-          cp dev-src/dev/index.html site/dev/index.html
-          sed -i "s#fetch('../index.html'#fetch('base.html'#" site/dev/index.html
           if [ -f dev-src/dev/changelog.html ]; then cp dev-src/dev/changelog.html site/dev/changelog.html; fi
           printf 'DEV_BRANCH=develop\nDEV_SHA=%s\n' "$(git -C dev-src rev-parse HEAD)" > site/dev/dev-version.txt
 
@@ -123,9 +117,6 @@ jobs:
           mkdir -p site/dev
           cp -R prod-src/dist/. site/dev/
           cp prod-src/favicon.svg site/dev/favicon.svg
-          cp site/dev/index.html site/dev/base.html
-          cp prod-src/dev/index.html site/dev/index.html
-          sed -i "s#fetch('../index.html'#fetch('base.html'#" site/dev/index.html
           if [ -f prod-src/changelog.html ]; then cp prod-src/changelog.html site/dev/changelog.html; fi
           printf 'DEV_BRANCH=main\nDEV_SHA=%s\n' "$(git -C prod-src rev-parse HEAD)" > site/dev/dev-version.txt
 
