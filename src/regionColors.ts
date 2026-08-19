@@ -1,3 +1,6 @@
+import { DEFAULT_REGION_COLORS, RegionColorSettings } from './application/settings/RegionColorSettings';
+import { LocalStorageRegionColorRepository } from './platform/web/settings/LocalStorageRegionColorRepository';
+
 type RegionColorBridge = {
   getBoard(): {
     size: number;
@@ -5,34 +8,6 @@ type RegionColorBridge = {
   };
   getSize(): number;
 };
-
-const DEFAULT_COLORS = [
-  '#9cc7e8', '#b97a56', '#38a8bb', '#ce6585', '#d6a900',
-  '#7d68cf', '#2f8f55', '#85cf72', '#ffd97d', '#e983d3',
-  '#64c96d', '#7bb2d8', '#ef8a62', '#9b8ad6', '#5bb7a7',
-  '#d77c94', '#6f9fd8', '#a7c957', '#f2a65a', '#8d99ae',
-];
-
-const STORAGE_KEY = 'nq-region-colors-v1';
-
-function loadColors(): string[] {
-  try {
-    const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null');
-    if (Array.isArray(parsed)) {
-      return DEFAULT_COLORS.map((fallback, index) => {
-        const value = parsed[index];
-        return typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value) ? value : fallback;
-      });
-    }
-  } catch {
-    // Ignore malformed local data and fall back to the built-in palette.
-  }
-  return DEFAULT_COLORS.slice();
-}
-
-function saveColors(colors: string[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(colors));
-}
 
 export function installRegionColors(app: RegionColorBridge): void {
   const palette = document.querySelector<HTMLElement>('#palette');
@@ -42,7 +17,8 @@ export function installRegionColors(app: RegionColorBridge): void {
   const paletteElement = palette;
   const boardElement = board;
 
-  let colors = loadColors();
+  const repository = new LocalStorageRegionColorRepository();
+  let settings = new RegionColorSettings();
   let panel: HTMLElement | null = null;
   let scheduled = false;
 
@@ -70,18 +46,12 @@ export function installRegionColors(app: RegionColorBridge): void {
 
   const toggle = tools.querySelector<HTMLButtonElement>('.region-color-toggle');
 
-  function ensureColorCapacity(size: number): void {
-    while (colors.length < size) {
-      colors.push(DEFAULT_COLORS[colors.length % DEFAULT_COLORS.length]);
-    }
-  }
-
   function buildPanel(): void {
     if (panel) panel.remove();
     panel = document.createElement('div');
     panel.className = 'region-color-panel open';
     const size = app.getSize();
-    ensureColorCapacity(size);
+    settings.ensureCapacity(size);
 
     const grid = document.createElement('div');
     grid.className = 'region-color-grid';
@@ -93,11 +63,11 @@ export function installRegionColors(app: RegionColorBridge): void {
       const picker = document.createElement('input');
       picker.type = 'color';
       picker.className = 'region-color-picker';
-      picker.value = colors[i];
+      picker.value = settings.colorAt(i);
       picker.title = `色塊 ${i + 1} 顏色`;
       picker.addEventListener('input', () => {
-        colors[i] = picker.value;
-        saveColors(colors);
+        settings.setColor(i, picker.value);
+        void settings.persist(repository);
         applyColors();
       });
       item.appendChild(picker);
@@ -111,9 +81,9 @@ export function installRegionColors(app: RegionColorBridge): void {
     reset.className = 'region-color-reset';
     reset.textContent = '恢復預設色';
     reset.addEventListener('click', () => {
-      colors = DEFAULT_COLORS.slice();
-      ensureColorCapacity(app.getSize());
-      saveColors(colors);
+      settings.reset();
+      settings.ensureCapacity(app.getSize());
+      void settings.persist(repository);
       buildPanel();
       applyColors();
     });
@@ -136,11 +106,11 @@ export function installRegionColors(app: RegionColorBridge): void {
 
   function applyColors(): void {
     const snapshot = app.getBoard();
-    ensureColorCapacity(snapshot.size);
+    settings.ensureCapacity(snapshot.size);
 
     const paletteButtons = Array.from(paletteElement.querySelectorAll<HTMLElement>('.colorBtn'));
     for (let i = 0; i < Math.min(snapshot.size, paletteButtons.length); i++) {
-      paletteButtons[i].style.background = colors[i];
+      paletteButtons[i].style.background = settings.colorAt(i);
     }
 
     const boardCells = Array.from(boardElement.querySelectorAll<HTMLElement>('.cell'));
@@ -148,7 +118,7 @@ export function installRegionColors(app: RegionColorBridge): void {
       const cell = snapshot.cells[i];
       const element = boardCells[i];
       if (cell.regionId >= 0) {
-        element.style.background = colors[cell.regionId] ?? DEFAULT_COLORS[cell.regionId % DEFAULT_COLORS.length];
+        element.style.background = settings.colorAt(cell.regionId) ?? DEFAULT_REGION_COLORS[cell.regionId % DEFAULT_REGION_COLORS.length];
       }
       element.classList.toggle('nq-marked', cell.state === 1 || cell.state === 2);
     }
@@ -167,12 +137,10 @@ export function installRegionColors(app: RegionColorBridge): void {
   observer.observe(paletteElement, { childList: true });
   observer.observe(boardElement, { childList: true });
 
-  // Legacy UI updates individual cell inline styles while dragging, without rebuilding the board.
   for (const eventName of ['pointerdown', 'pointermove', 'pointerup', 'pointercancel']) {
     boardElement.addEventListener(eventName, scheduleApply);
   }
 
-  // N may change after a new board is built; rebuild the editor the next time it is opened.
   document.querySelector('#new')?.addEventListener('click', () => {
     if (panel) {
       panel.remove();
@@ -189,4 +157,9 @@ export function installRegionColors(app: RegionColorBridge): void {
   document.querySelector('#autoQueen')?.addEventListener('click', scheduleApply);
 
   applyColors();
+  void RegionColorSettings.load(repository).then((loaded) => {
+    settings = loaded;
+    if (panel?.classList.contains('open')) buildPanel();
+    applyColors();
+  });
 }

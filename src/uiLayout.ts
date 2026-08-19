@@ -1,3 +1,5 @@
+import { UiSession } from './application/ui/UiSession';
+
 type UiBridge = { isPlayMode(): boolean; getBoard(): { size:number; cells:Array<{row:number;col:number;regionId:number;state:number}> }; installBoard(board:{size:number;cells:Array<{row:number;col:number;regionId:number;state:number}>}):void };
 
 export function installUiLayout(app: UiBridge): void {
@@ -19,6 +21,7 @@ export function installUiLayout(app: UiBridge): void {
   const mode=document.querySelector<HTMLElement>('#mode');
   if(!toolbar||!mainPanel||!board||!palette||!randomBtn||!editBtn||!playBtn||!undoBtn||!clearBtn||!stepBtn||!autoBtn||!solver||!annotationTools||!colorTools)return;
 
+  const ui=new UiSession();
   const style=document.createElement('style'); style.textContent=`
   body.nq-source-ui .toolbar{gap:10px;position:relative;overflow:visible}
   body.nq-source-ui .toolbar #random,body.nq-source-ui .toolbar #edit,body.nq-source-ui .toolbar #undo,body.nq-source-ui .toolbar #clear,body.nq-source-ui .toolbar .stats{display:none!important}
@@ -33,9 +36,14 @@ export function installUiLayout(app: UiBridge): void {
   const newBtn=document.querySelector<HTMLButtonElement>('#new'); if(newBtn)newBtn.textContent='設定棋盤大小'; playBtn.textContent='開始推演'; randomBtn.textContent='產生隨機棋盤'; undoBtn.textContent='上一步'; clearBtn.textContent='清空'; stepBtn.textContent='推演一步'; autoBtn.textContent='推演到下一個皇后';
   const editActions=document.createElement('div');editActions.className='nq-edit-actions';mainPanel.insertBefore(editActions,palette);editActions.append(randomBtn);
   const clearBoard=document.createElement('button');clearBoard.type='button';clearBoard.textContent='清空棋盤';clearBoard.addEventListener('click',()=>{const s=app.getBoard();app.installBoard({size:s.size,cells:s.cells.map(c=>({...c,regionId:-1,state:0}))});});editActions.append(clearBoard);editActions.append(colorTools);const colorToggle=colorTools.querySelector<HTMLButtonElement>('.region-color-toggle');if(colorToggle)colorToggle.textContent='🎨 設定色塊顏色';
-  const playActions=document.createElement('div');playActions.className='nq-play-actions';annotationTools.insertAdjacentElement('afterend',playActions);const tips=document.createElement('button');tips.type='button';tips.className='nq-rule-tip';tips.textContent='💡 規則 Tips';playActions.append(tips,undoBtn,clearBtn,stepBtn,autoBtn);if(guide){playActions.insertAdjacentElement('afterend',guide);guide.classList.remove('nq-open');tips.addEventListener('click',()=>guide.classList.toggle('nq-open'));}
-  const opTip=document.createElement('button');opTip.type='button';opTip.className='nq-operation-tip';opTip.textContent='💡 操作 Tips';const opPanel=document.createElement('div');opPanel.className='nq-operation-panel';opPanel.innerHTML='<b>操作說明</b><div>單點空白格：標記 X。</div><div>同一格 1 秒內連點兩下：放置皇后。</div><div>超過 1 秒：X 保留。</div><div>改點其他格：原本 X 保留，新格重新開始判定。</div><div>單點皇后：清空該格。</div><div>拖曳：連續標記或清除 X。</div>';toolbar.append(opTip,opPanel);opTip.addEventListener('click',()=>opPanel.classList.toggle('open'));
-  const sync=()=>{const play=app.isPlayMode();document.body.classList.toggle('nq-play-mode',play);playBtn.textContent=play?'離開推演模式':'開始推演';playActions.classList.toggle('solver-unlocked',solver.style.display==='block');if(!play){guide?.classList.remove('nq-open');opPanel.classList.remove('open');}};
+  const playActions=document.createElement('div');playActions.className='nq-play-actions';annotationTools.insertAdjacentElement('afterend',playActions);const tips=document.createElement('button');tips.type='button';tips.className='nq-rule-tip';tips.textContent='💡 規則 Tips';playActions.append(tips,undoBtn,clearBtn,stepBtn,autoBtn);if(guide){playActions.insertAdjacentElement('afterend',guide);guide.classList.remove('nq-open');}
+  const opTip=document.createElement('button');opTip.type='button';opTip.className='nq-operation-tip';opTip.textContent='💡 操作 Tips';const opPanel=document.createElement('div');opPanel.className='nq-operation-panel';opPanel.innerHTML='<b>操作說明</b><div>單點空白格：標記 X。</div><div>同一格 1 秒內連點兩下：放置皇后。</div><div>超過 1 秒：X 保留。</div><div>改點其他格：原本 X 保留，新格重新開始判定。</div><div>單點皇后：清空該格。</div><div>拖曳：連續標記或清除 X。</div>';toolbar.append(opTip,opPanel);
+
+  const render=()=>{const state=ui.snapshot();document.body.classList.toggle('nq-play-mode',state.playMode);playBtn.textContent=state.playMode?'離開推演模式':'開始推演';playActions.classList.toggle('solver-unlocked',state.solverUnlocked);guide?.classList.toggle('nq-open',state.ruleGuideOpen);opPanel.classList.toggle('open',state.operationTipsOpen)};
+  const sync=()=>{ui.setPlayMode(app.isPlayMode());ui.setSolverUnlocked(solver.style.display==='block');render()};
+
+  tips.addEventListener('click',()=>{ui.toggleRuleGuide();render()});
+  opTip.addEventListener('click',()=>{ui.toggleOperationTips();render()});
   playBtn.addEventListener('click',(event)=>{if(!app.isPlayMode())return;event.preventDefault();event.stopImmediatePropagation();const handler=editBtn.onclick;if(typeof handler==='function'){const pointerEvent=new PointerEvent('click',{bubbles:false,cancelable:true,pointerType:'mouse'});handler.call(editBtn,pointerEvent);}requestAnimationFrame(sync);},true);
   new MutationObserver(sync).observe(solver,{attributes:true,attributeFilter:['style']});editBtn.addEventListener('click',()=>requestAnimationFrame(sync));playBtn.addEventListener('click',()=>requestAnimationFrame(sync));newBtn?.addEventListener('click',()=>requestAnimationFrame(sync));sync();
 }
