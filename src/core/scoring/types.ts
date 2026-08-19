@@ -1,3 +1,5 @@
+import type { AssistUsage } from '../economy/types';
+
 export type ScoreVersion = number;
 
 export type GameMode = 'level' | 'difficulty' | 'custom';
@@ -24,6 +26,8 @@ export interface CompletedGameResult {
   elapsedMs: number;
   hintsUsed: number;
   mistakes: number;
+  /** Consumable solver assists used during this game. Kept separate from generic hints for scoring/ranking policy. */
+  assistsUsed: AssistUsage[];
   completedAt: string;
   score: ScoreBreakdown;
 }
@@ -35,6 +39,7 @@ export interface ScoreInput {
   elapsedMs: number;
   hintsUsed: number;
   mistakes: number;
+  assistsUsed: AssistUsage[];
 }
 
 /**
