@@ -1,5 +1,7 @@
 export { CellState } from './board/types';
 export type { BoardSnapshot, CellChange, CellSnapshot } from './board/types';
+export { validateRegions } from './board/validation';
+export type { BoardValidationResult } from './board/validation';
 export type { BoardModifier, ChallengeAttempt, ChallengeDefinition, ChallengeKind, DailyChallengeState } from './challenge/types';
 export type { CosmeticCollection, CosmeticLoadout, CrownDefinition, CrownKind, RevealEffectDefinition, ThemeDefinition } from './cosmetics/types';
 export type { AssistItemId, DailyRewardDefinition, DailyRewardState, InventoryBalance, StoreProduct } from './economy/types';
