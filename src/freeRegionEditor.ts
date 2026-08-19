@@ -1,5 +1,6 @@
+import { RegionEditorSession, type CellPosition } from './application/editor/RegionEditorSession';
 import { installPlayPointerGuard } from './playPointerGuard';
-import type { BoardSnapshot } from './solver/types';
+import type { BoardSnapshot } from './core/board/types';
 
 type RegionEditorBridge = {
   getBoard(): BoardSnapshot;
@@ -8,8 +9,6 @@ type RegionEditorBridge = {
   installBoard(board: BoardSnapshot): void;
 };
 
-type CellPosition = { row: number; col: number };
-
 export function installFreeRegionEditor(app: RegionEditorBridge): void {
   installPlayPointerGuard(app);
 
@@ -17,14 +16,7 @@ export function installFreeRegionEditor(app: RegionEditorBridge): void {
   const palette = document.querySelector<HTMLElement>('#palette');
   if (!board || !palette) return;
 
-  let selectedRegion = 0;
-  let dragging = false;
-  let moved = false;
-  let start: CellPosition | null = null;
-  let visited = new Set<string>();
-  let working: BoardSnapshot | null = null;
-
-  const keyOf = (row: number, col: number): string => `${row},${col}`;
+  const editor = new RegionEditorSession(app.getBoard());
 
   const hitCell = (clientX: number, clientY: number): CellPosition | null => {
     const element = document.elementFromPoint(clientX, clientY);
@@ -33,7 +25,12 @@ export function installFreeRegionEditor(app: RegionEditorBridge): void {
     return { row: Number(cell.dataset.row), col: Number(cell.dataset.col) };
   };
 
+  const syncFromApp = (): void => {
+    editor.setBoard(app.getBoard());
+  };
+
   const syncPaletteSelection = (): void => {
+    const selectedRegion = editor.snapshot().selectedRegion;
     const buttons = Array.from(palette.querySelectorAll<HTMLElement>('.colorBtn'));
     buttons.forEach((button, index) => {
       const expected = selectedRegion < 0 ? index === app.getSize() : index === selectedRegion;
@@ -41,18 +38,10 @@ export function installFreeRegionEditor(app: RegionEditorBridge): void {
     });
   };
 
-  const installWorkingBoard = (): void => {
-    if (!working) return;
-    app.installBoard(working);
+  const installIfChanged = (next: BoardSnapshot | null): void => {
+    if (!next) return;
+    app.installBoard(next);
     requestAnimationFrame(syncPaletteSelection);
-  };
-
-  const assign = (position: CellPosition, regionId: number): void => {
-    if (!working) return;
-    const cell = working.cells.find((item) => item.row === position.row && item.col === position.col);
-    if (!cell || cell.regionId === regionId) return;
-    cell.regionId = regionId;
-    installWorkingBoard();
   };
 
   palette.addEventListener('pointerdown', (event) => {
@@ -62,7 +51,8 @@ export function installFreeRegionEditor(app: RegionEditorBridge): void {
     const buttons = Array.from(palette.querySelectorAll<HTMLElement>('.colorBtn'));
     const index = buttons.indexOf(button);
     if (index < 0) return;
-    selectedRegion = index >= app.getSize() ? -1 : index;
+    syncFromApp();
+    editor.selectRegion(index >= app.getSize() ? -1 : index);
     requestAnimationFrame(syncPaletteSelection);
   }, true);
 
@@ -74,75 +64,44 @@ export function installFreeRegionEditor(app: RegionEditorBridge): void {
 
     event.preventDefault();
     event.stopImmediatePropagation();
-    dragging = true;
-    moved = false;
-    start = hit;
-    visited = new Set<string>();
-    working = app.getBoard();
+    syncFromApp();
     board.setPointerCapture?.(event.pointerId);
-
-    if (selectedRegion < 0) {
-      visited.add(keyOf(hit.row, hit.col));
-      assign(hit, -1);
-    }
+    installIfChanged(editor.beginStroke(hit));
   }, true);
 
   board.addEventListener('pointermove', (event) => {
-    if (!dragging || app.isPlayMode()) return;
+    if (!editor.snapshot().dragging || app.isPlayMode()) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     const hit = hitCell(event.clientX, event.clientY);
-    if (!hit || !start) return;
-
-    if (hit.row !== start.row || hit.col !== start.col) moved = true;
-    if (!moved && selectedRegion >= 0) return;
-
-    if (selectedRegion >= 0 && visited.size === 0) {
-      visited.add(keyOf(start.row, start.col));
-      assign(start, selectedRegion);
-    }
-
-    const key = keyOf(hit.row, hit.col);
-    if (visited.has(key)) return;
-    visited.add(key);
-    assign(hit, selectedRegion);
+    if (!hit) return;
+    installIfChanged(editor.moveStroke(hit));
   }, true);
 
   const finish = (event: PointerEvent): void => {
-    if (!dragging || app.isPlayMode()) return;
+    if (!editor.snapshot().dragging || app.isPlayMode()) return;
     event.preventDefault();
     event.stopImmediatePropagation();
     try { board.releasePointerCapture?.(event.pointerId); } catch { /* ignore */ }
-
-    if (start && !moved && selectedRegion >= 0) {
-      working ??= app.getBoard();
-      const cell = working.cells.find((item) => item.row === start!.row && item.col === start!.col);
-      if (cell) assign(start, cell.regionId === selectedRegion ? -1 : selectedRegion);
-    }
-
-    dragging = false;
-    moved = false;
-    start = null;
-    visited.clear();
-    working = null;
+    installIfChanged(editor.endStroke());
   };
 
   board.addEventListener('pointerup', finish, true);
   board.addEventListener('pointercancel', (event) => {
-    if (!dragging || app.isPlayMode()) return;
+    if (!editor.snapshot().dragging || app.isPlayMode()) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    dragging = false;
-    moved = false;
-    start = null;
-    visited.clear();
-    working = null;
+    editor.cancelStroke();
   }, true);
 
   document.querySelector('#new')?.addEventListener('click', () => {
-    selectedRegion = 0;
+    syncFromApp();
+    editor.resetSelection();
     requestAnimationFrame(syncPaletteSelection);
   });
-  document.querySelector('#edit')?.addEventListener('click', () => requestAnimationFrame(syncPaletteSelection));
+  document.querySelector('#edit')?.addEventListener('click', () => {
+    syncFromApp();
+    requestAnimationFrame(syncPaletteSelection);
+  });
   requestAnimationFrame(syncPaletteSelection);
 }
