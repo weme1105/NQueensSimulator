@@ -1,5 +1,10 @@
 export { CellState } from './board/types';
 export type { BoardSnapshot, CellChange, CellSnapshot } from './board/types';
+export type { BoardModifier, ChallengeAttempt, ChallengeDefinition, ChallengeKind, DailyChallengeState } from './challenge/types';
+export type { CosmeticCollection, CosmeticLoadout, CrownDefinition, CrownKind, RevealEffectDefinition, ThemeDefinition } from './cosmetics/types';
+export type { AssistItemId, DailyRewardDefinition, DailyRewardState, InventoryBalance, StoreProduct } from './economy/types';
+export { balanceOf } from './economy/wallet';
+export type { CurrencyCode, WalletBalance, WalletSnapshot, WalletTransaction } from './economy/wallet';
 export { queenConflictMessage, immediateExclusions } from './game/rules';
 export { AUTO_PIPELINE, STEP_PIPELINE } from './solver/pipeline';
 export type { DeductionResult, SolverRule } from './solver/types';
