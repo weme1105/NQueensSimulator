@@ -1,6 +1,6 @@
 import type { BoardSnapshot } from '../../core/board/types';
 import { GameController } from './GameController';
-import { GameSession, type GameSessionListener, type GameSessionState } from './GameSession';
+import { GameSession, type GameMode, type GameSessionListener, type GameSessionState } from './GameSession';
 
 /**
  * UI-facing application facade. Web, iOS and Android adapters should bind to this
@@ -24,6 +24,12 @@ export class GameViewModel {
     this.session.setBoard(board);
   }
 
+  /** Transitional bridge while the existing Web shell still owns manual edits/mode. */
+  syncExternalState(board: BoardSnapshot, mode: GameMode): void {
+    this.session.setBoard(board);
+    this.session.syncMode(mode);
+  }
+
   exitPlay(): void {
     this.controller.cancel();
     this.session.enterEdit();
@@ -37,11 +43,11 @@ export class GameViewModel {
     return this.controller.validatePuzzle(true);
   }
 
-  step(): Promise<unknown> {
+  step(): Promise<DeductionResult | null> {
     return this.controller.runStep();
   }
 
-  auto(): Promise<unknown> {
+  auto(): Promise<DeductionResult | null> {
     return this.controller.runAuto();
   }
 
@@ -53,3 +59,5 @@ export class GameViewModel {
     this.controller.cancel();
   }
 }
+
+import type { DeductionResult } from '../../core/solver/types';
