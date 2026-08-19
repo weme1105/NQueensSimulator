@@ -1,8 +1,9 @@
+import type { GeneratedPuzzleResult, SolverService } from '../application/solver/SolverService';
 import type { BoardSnapshot, DeductionResult, WorkerRequest, WorkerResponse } from './types';
 
-export type GeneratedPuzzleResult = { board: BoardSnapshot; attempts: number };
+export type { GeneratedPuzzleResult } from '../application/solver/SolverService';
 
-export class SolverWorkerClient {
+export class SolverWorkerClient implements SolverService {
   private worker: Worker | null = null;
   private sequence = 0;
   private pendingReject: ((reason?: unknown) => void) | null = null;
@@ -14,8 +15,6 @@ export class SolverWorkerClient {
   cancel(reason = 'Solver cancelled'): void {
     const worker = this.worker;
     this.worker = null;
-    // Detach callbacks before terminate so a late error/message from an old worker
-    // cannot settle a newer request.
     if (worker) {
       worker.onmessage = null;
       worker.onerror = null;
@@ -106,7 +105,7 @@ export class SolverWorkerClient {
       };
       worker.onerror = (event) => {
         if (this.worker !== worker) return;
-        settle(() => reject(new Error(event.message || 'Solver worker failed')));
+        settle(() => reject(new Error(event.message || 'Solver worker failed'));
       };
       worker.postMessage(request);
     });
