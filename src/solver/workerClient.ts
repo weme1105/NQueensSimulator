@@ -1,5 +1,6 @@
 import type { GeneratedPuzzleResult, SolverService } from '../application/solver/SolverService';
-import type { BoardSnapshot, DeductionResult, WorkerRequest, WorkerResponse } from './types';
+import type { WorkerRequest, WorkerResponse } from '../platform/web/solver/workerProtocol';
+import type { BoardSnapshot, DeductionResult } from './types';
 
 export type { GeneratedPuzzleResult } from '../application/solver/SolverService';
 
