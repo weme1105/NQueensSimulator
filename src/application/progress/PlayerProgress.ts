@@ -1,3 +1,5 @@
+import type { CompletedGameResult } from '../../core/scoring/types';
+
 export type AnonymousPlayerId = string;
 export type AuthenticatedUserId = string;
 
@@ -15,6 +17,8 @@ export interface LevelProgressEntry {
   completed: boolean;
   bestMoves?: number;
   bestTimeMs?: number;
+  bestScore?: number;
+  scoreVersion?: number;
   hintsUsed?: number;
   completedAt?: string;
 }
@@ -25,6 +29,8 @@ export interface PlayerStatistics {
   hintsUsed: number;
   currentStreak: number;
   bestStreak: number;
+  totalScore: number;
+  bestSingleGameScore: number;
 }
 
 export interface PlayerProgress {
@@ -33,6 +39,8 @@ export interface PlayerProgress {
   tutorial: TutorialProgress;
   levels: LevelProgressEntry[];
   statistics: PlayerStatistics;
+  /** Local-first score history. Can be associated with an account after login. */
+  completedResults: CompletedGameResult[];
   createdAt: string;
   updatedAt: string;
 }
@@ -43,7 +51,16 @@ export function createAnonymousProgress(playerId: AnonymousPlayerId, nowIso = ne
     identity: { kind: 'anonymous', playerId },
     tutorial: { completedLevelIds: [], skipped: false },
     levels: [],
-    statistics: { gamesStarted: 0, gamesCompleted: 0, hintsUsed: 0, currentStreak: 0, bestStreak: 0 },
+    statistics: {
+      gamesStarted: 0,
+      gamesCompleted: 0,
+      hintsUsed: 0,
+      currentStreak: 0,
+      bestStreak: 0,
+      totalScore: 0,
+      bestSingleGameScore: 0,
+    },
+    completedResults: [],
     createdAt: nowIso,
     updatedAt: nowIso,
   };
