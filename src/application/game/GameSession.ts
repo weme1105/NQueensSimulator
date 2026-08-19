@@ -56,6 +56,17 @@ export class GameSession {
     this.emit();
   }
 
+  /** Transitional adapter hook while the legacy Web shell still owns mode changes. */
+  syncMode(mode: GameMode): void {
+    if (this.state.mode === mode) return;
+    this.state = {
+      ...this.state,
+      mode,
+      solutionType: mode === 'edit' ? 'unknown' : this.state.solutionType,
+    };
+    this.emit();
+  }
+
   applyChanges(changes: readonly CellChange[]): void {
     if (!changes.length) return;
     const byKey = new Map(changes.map((change) => [`${change.row},${change.col}`, change] as const));
