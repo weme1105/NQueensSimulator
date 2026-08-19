@@ -1,3 +1,4 @@
+import type { DailyRewardState, InventoryBalance } from '../../core/economy/types';
 import type { CompletedGameResult } from '../../core/scoring/types';
 
 export type AnonymousPlayerId = string;
@@ -39,6 +40,9 @@ export interface PlayerProgress {
   tutorial: TutorialProgress;
   levels: LevelProgressEntry[];
   statistics: PlayerStatistics;
+  /** Local-first consumable inventory. Purchases and daily login rewards both grant into this balance. */
+  inventory: InventoryBalance[];
+  dailyReward: DailyRewardState;
   /** Local-first score history. Can be associated with an account after login. */
   completedResults: CompletedGameResult[];
   createdAt: string;
@@ -60,6 +64,8 @@ export function createAnonymousProgress(playerId: AnonymousPlayerId, nowIso = ne
       totalScore: 0,
       bestSingleGameScore: 0,
     },
+    inventory: [],
+    dailyReward: { totalClaims: 0 },
     completedResults: [],
     createdAt: nowIso,
     updatedAt: nowIso,
