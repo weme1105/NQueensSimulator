@@ -41,7 +41,7 @@ export class RegionColorSettings {
   }
 
   reset(): void {
-    this.colors = DEFAULT_REGION_COLORS.slice();
+    this.colors = [...DEFAULT_REGION_COLORS];
   }
 
   async persist(repository: RegionColorRepository): Promise<void> {
@@ -56,7 +56,7 @@ export class RegionColorSettings {
 }
 
 function normalizeColors(values: readonly string[]): string[] {
-  const result = DEFAULT_REGION_COLORS.slice();
+  const result: string[] = [...DEFAULT_REGION_COLORS];
   for (let index = 0; index < values.length; index++) {
     const value = values[index];
     if (!isHexColor(value)) continue;
