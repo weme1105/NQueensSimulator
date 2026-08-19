@@ -106,7 +106,7 @@ export class SolverWorkerClient implements SolverService {
       };
       worker.onerror = (event) => {
         if (this.worker !== worker) return;
-        settle(() => reject(new Error(event.message || 'Solver worker failed'));
+        settle(() => reject(new Error(event.message || 'Solver worker failed')));
       };
       worker.postMessage(request);
     });
