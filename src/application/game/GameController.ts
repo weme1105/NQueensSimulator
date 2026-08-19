@@ -1,5 +1,5 @@
+import { validateRegions, type BoardSnapshot, type DeductionResult } from '../../core';
 import { immediateExclusions, queenConflictMessage } from '../../core/game/rules';
-import type { BoardSnapshot, DeductionResult } from '../../core';
 import type { SolverService } from '../solver/SolverService';
 import { GameSession, type PuzzleSolutionType } from './GameSession';
 
@@ -29,10 +29,17 @@ export class GameController {
   }
 
   async validatePuzzle(enterPlay = false): Promise<PuzzleSolutionType | 'none'> {
+    const board = this.session.snapshot().board;
+    const regionValidation = validateRegions(board);
+    if (!regionValidation.ok) {
+      this.session.setStatus(regionValidation.message ?? '色塊設定不完整。', 'bad');
+      return 'none';
+    }
+
     const token = ++this.validationSequence;
     this.session.setSolverBusy(true);
     try {
-      const count = await this.solver.countSolutions(this.session.snapshot().board, 2, 10_000);
+      const count = await this.solver.countSolutions(board, 2, 10_000);
       if (token !== this.validationSequence) return 'none';
       if (count === 0) {
         this.session.setStatus('此色塊配置無解，請調整色塊。', 'bad');
