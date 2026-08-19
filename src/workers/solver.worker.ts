@@ -1,7 +1,8 @@
 /// <reference lib="webworker" />
+import type { WorkerRequest, WorkerResponse } from '../platform/web/solver/workerProtocol';
 import { SolverEngine } from '../solver/engine';
 import { generateUniquePuzzle } from '../solver/generator';
-import type { CellChange, DeductionResult, WorkerRequest, WorkerResponse } from '../solver/types';
+import type { CellChange, DeductionResult } from '../solver/types';
 
 declare const self: DedicatedWorkerGlobalScope;
 
