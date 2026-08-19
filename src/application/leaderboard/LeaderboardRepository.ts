@@ -9,12 +9,12 @@ export interface LeaderboardQuery {
   difficulty?: string;
   scoreVersion?: ScoreVersion;
   limit?: number;
-  aroundPlayerId?: string;
+  aroundUserId?: string;
 }
 
 export interface LeaderboardEntry {
   rank: number;
-  playerId: string;
+  userId: string;
   displayName: string;
   score: number;
   scoreVersion: ScoreVersion;
@@ -30,10 +30,20 @@ export interface LeaderboardPage {
 }
 
 /**
+ * A score is globally rankable only when it was earned by an authenticated user.
+ * Anonymous/local scores remain part of PlayerProgress but are never retroactively
+ * submitted to the global leaderboard after login.
+ */
+export interface AuthenticatedScoreSubmission {
+  userId: string;
+  result: CompletedGameResult;
+}
+
+/**
  * Global ranking boundary. A Web/App adapter can later implement this with a backend.
  * Local progress remains usable even when this service is unavailable.
  */
 export interface LeaderboardRepository {
-  submit(result: CompletedGameResult): Promise<void>;
+  submit(submission: AuthenticatedScoreSubmission): Promise<void>;
   query(request: LeaderboardQuery): Promise<LeaderboardPage>;
 }
