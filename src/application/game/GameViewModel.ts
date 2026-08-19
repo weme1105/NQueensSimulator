@@ -1,4 +1,5 @@
 import type { BoardSnapshot } from '../../core/board/types';
+import type { DeductionResult } from '../../core/solver/types';
 import { GameController } from './GameController';
 import { GameSession, type GameMode, type GameSessionListener, type GameSessionState } from './GameSession';
 
@@ -59,5 +60,3 @@ export class GameViewModel {
     this.controller.cancel();
   }
 }
-
-import type { DeductionResult } from '../../core/solver/types';
