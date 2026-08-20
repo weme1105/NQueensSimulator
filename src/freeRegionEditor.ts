@@ -51,6 +51,11 @@ export function installFreeRegionEditor(app: RegionEditorBridge): void {
     if (!working) return;
     const cell = working.cells.find((item) => item.row === position.row && item.col === position.col);
     if (!cell || cell.regionId === regionId) return;
+
+    // Painting a region may only fill empty cells. Existing regions must be
+    // cleared explicitly before they can be assigned to another region.
+    if (regionId >= 0 && cell.regionId >= 0 && cell.regionId !== regionId) return;
+
     cell.regionId = regionId;
     installWorkingBoard();
   };
