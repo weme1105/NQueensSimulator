@@ -27,6 +27,7 @@ export function installUiLayout(app: UiBridge): void {
   .nq-rule-tip{display:none}.nq-play-mode .nq-rule-tip{display:inline-flex}.nq-play-mode .play-guide:not(.nq-open){display:none!important}.nq-play-mode .play-guide.nq-open{display:grid!important;width:100%;margin-top:0}.nq-play-actions:not(.solver-unlocked) #stepSolve,.nq-play-actions:not(.solver-unlocked) #autoQueen{display:none!important}.nq-play-actions.solver-unlocked #stepSolve,.nq-play-actions.solver-unlocked #autoQueen{display:inline-block!important}
   .nq-play-mode .toolbar>span:first-child,.nq-play-mode .toolbar #n,.nq-play-mode .toolbar #new{display:none!important}.nq-play-mode .toolbar #play{margin-right:auto}body:not(.nq-play-mode) .annotation-tools{display:none!important}
   .nq-operation-tip{display:none;margin-left:auto}.nq-play-mode .nq-operation-tip{display:inline-flex}.nq-operation-panel{display:none;position:absolute;right:16px;top:calc(100% + 8px);z-index:120;width:min(390px,calc(100vw - 40px));padding:12px 14px;border:1px solid #eaded8;border-radius:12px;background:#fff;box-shadow:0 10px 28px #0002;line-height:1.65;font-size:13px}.nq-operation-panel.open{display:block}.nq-operation-panel b{display:block;margin-bottom:5px;font-size:14px}
+  button,.cell,#board,#palette,.annotation-canvas{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
   @media(max-width:850px){.nq-edit-actions,.nq-play-actions{gap:6px}.nq-operation-panel{right:8px}}`;
   document.head.append(style); document.body.classList.add('nq-source-ui'); if(mode)mode.hidden=true;
 
