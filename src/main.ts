@@ -90,8 +90,10 @@ async function validatePuzzle(enterPlay = false): Promise<void> {
     if (token !== validationSequence) return;
     if (count === 0) { app.showStatus('此色塊配置無解，請調整色塊。', 'bad'); return; }
     const solutionType: SolutionType = count === 1 ? 'unique' : 'multiple';
-    if (enterPlay) app.activatePlay(solutionType);
-    else if (solutionType === 'unique') app.showStatus('✓ 題目驗證通過：唯一解。', 'ok');
+    if (enterPlay) {
+      app.activatePlay(solutionType);
+      if (playButton) playButton.textContent = '離開推演模式';
+    } else if (solutionType === 'unique') app.showStatus('✓ 題目驗證通過：唯一解。', 'ok');
     else app.showStatus('△ 題目可解，但存在多組解，不是唯一解。', 'warn');
   } catch (error) {
     if (token !== validationSequence) return;
