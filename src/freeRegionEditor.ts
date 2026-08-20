@@ -47,14 +47,14 @@ export function installFreeRegionEditor(app: RegionEditorBridge): void {
     requestAnimationFrame(syncPaletteSelection);
   };
 
-  const assign = (position: CellPosition, regionId: number): void => {
+  const assign = (position: CellPosition, regionId: number, allowOverwrite = false): void => {
     if (!working) return;
     const cell = working.cells.find((item) => item.row === position.row && item.col === position.col);
     if (!cell || cell.regionId === regionId) return;
 
-    // Painting a region may only fill empty cells. Existing regions must be
-    // cleared explicitly before they can be assigned to another region.
-    if (regionId >= 0 && cell.regionId >= 0 && cell.regionId !== regionId) return;
+    // Drag painting only fills empty cells so crossing another region preserves it.
+    // A deliberate single tap may recolor an existing cell.
+    if (!allowOverwrite && regionId >= 0 && cell.regionId >= 0 && cell.regionId !== regionId) return;
 
     cell.regionId = regionId;
     installWorkingBoard();
@@ -122,7 +122,7 @@ export function installFreeRegionEditor(app: RegionEditorBridge): void {
     if (start && !moved && selectedRegion >= 0) {
       working ??= app.getBoard();
       const cell = working.cells.find((item) => item.row === start!.row && item.col === start!.col);
-      if (cell) assign(start, cell.regionId === selectedRegion ? -1 : selectedRegion);
+      if (cell) assign(start, cell.regionId === selectedRegion ? -1 : selectedRegion, true);
     }
 
     dragging = false;
