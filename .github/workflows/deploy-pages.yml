@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - develop
   workflow_dispatch:
     inputs:
       target_sha:
@@ -30,10 +31,13 @@ jobs:
         env:
           EVENT_NAME: ${{ github.event_name }}
           PUSH_SHA: ${{ github.sha }}
+          PUSH_BRANCH: ${{ github.ref_name }}
           TARGET_SHA: ${{ inputs.target_sha }}
         run: |
-          if [ "$EVENT_NAME" = "push" ]; then
+          if [ "$EVENT_NAME" = "push" ] && [ "$PUSH_BRANCH" = "main" ]; then
             REF="$PUSH_SHA"
+          elif [ "$EVENT_NAME" = "push" ] && [ "$PUSH_BRANCH" = "develop" ]; then
+            REF="main"
           elif [ -n "$TARGET_SHA" ]; then
             REF="$TARGET_SHA"
           else
