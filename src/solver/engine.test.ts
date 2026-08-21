@@ -63,11 +63,60 @@ describe('basic deductions', () => {
     expect(result?.producesQueen).toBe(true);
     expect(result?.changes).toEqual([{ row: 0, col: 3, newState: CellState.Queen }]);
   });
+
+  it('does not guess when a rule has no provable deduction', () => {
+    const engine = new SolverEngine(board(4));
+    expect(engine.runRule('basic')).toBeNull();
+  });
+});
+
+describe('state application', () => {
+  it('applies only real state changes and preserves board coordinates', () => {
+    const engine = new SolverEngine(board(4));
+    const applied = engine.apply([
+      { row: 1, col: 2, newState: CellState.Excluded },
+      { row: 1, col: 2, newState: CellState.Excluded },
+    ]);
+
+    expect(applied).toEqual([{ row: 1, col: 2, newState: CellState.Excluded }]);
+    expect(engine.toBoard().cells.find((c) => c.row === 1 && c.col === 2)?.state).toBe(CellState.Excluded);
+  });
+
+  it('counts queens from current state', () => {
+    const engine = new SolverEngine(board(4, {
+      '0,0': CellState.Queen,
+      '2,2': CellState.Queen,
+    }));
+    expect(engine.countQueens()).toBe(2);
+  });
+});
+
+describe('contradiction protection', () => {
+  it('rejects two queens in the same row before solving', () => {
+    const engine = new SolverEngine(board(4, {
+      '0,0': CellState.Queen,
+      '0,2': CellState.Queen,
+    }));
+    expect(() => engine.nextStep()).toThrow(/Row 1 有多個皇后/);
+  });
+
+  it('rejects two queens in the same column before auto solving', () => {
+    const engine = new SolverEngine(board(4, {
+      '0,1': CellState.Queen,
+      '2,1': CellState.Queen,
+    }));
+    expect(() => engine.nextAutoDeduction()).toThrow(/Column 2 有多個皇后/);
+  });
 });
 
 describe('solution counter', () => {
   it('stops at the requested solution limit', () => {
     const engine = new SolverEngine(board(4));
     expect(engine.countSolutions(2)).toBe(2);
+  });
+
+  it('honors a limit of one without continuing search', () => {
+    const engine = new SolverEngine(board(4));
+    expect(engine.countSolutions(1)).toBe(1);
   });
 });
