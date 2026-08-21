@@ -8,8 +8,10 @@ on:
     paths:
       - 'index.html'
       - 'src/**'
+      - 'e2e/**'
       - 'package.json'
       - 'eslint.config.js'
+      - 'playwright.config.ts'
       - 'tsconfig.json'
       - 'vite.config.ts'
       - '.github/workflows/ci.yml'
@@ -17,8 +19,10 @@ on:
     paths:
       - 'index.html'
       - 'src/**'
+      - 'e2e/**'
       - 'package.json'
       - 'eslint.config.js'
+      - 'playwright.config.ts'
       - 'tsconfig.json'
       - 'vite.config.ts'
       - '.github/workflows/ci.yml'
@@ -52,6 +56,12 @@ jobs:
 
       - name: Production build
         run: npm run build
+
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser E2E tests
+        run: npm run e2e
 
       - name: Legacy JavaScript syntax check
         run: |
