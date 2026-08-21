@@ -24,15 +24,13 @@ export function installSecretUnlock(): void {
   // gesture can no longer accumulate to seven clicks.
   newButton?.addEventListener('click', () => {
     requestAnimationFrame(() => {
-      const handler = editButton?.onclick;
-      if (typeof handler === 'function') {
-        const event = new PointerEvent('click', {
-          bubbles: false,
-          cancelable: true,
-          pointerType: 'mouse',
-        });
-        handler.call(editButton, event);
-      }
+      if (!editButton || typeof editButton.onclick !== 'function') return;
+      const event = new PointerEvent('click', {
+        bubbles: false,
+        cancelable: true,
+        pointerType: 'mouse',
+      });
+      editButton.onclick.call(editButton, event);
     });
   });
 }
