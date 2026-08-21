@@ -15,7 +15,7 @@
     "audit": "npm audit --audit-level=high",
     "build": "tsc -b && vite build",
     "build:dev": "tsc -b && vite build --base=/NQueensSimulator/dev/",
-    "quality": "npm run lint && npm run typecheck && npm test && npm run test:coverage && npm run audit && npm run build",
+    "quality": "npm run lint && npm run typecheck && npm test && npm run test:coverage && npm run audit && npm run build && npm run e2e",
     "preview": "vite preview"
   },
   "devDependencies": {
