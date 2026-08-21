@@ -18,9 +18,7 @@ export function installAnnotationCanvas(app: AnnotationBridge): void {
   if(!board||!board.parentElement) return;
 
   if(!document.querySelector('link[rel~="icon"]')){
-    const icon=document.createElement('link');
-    icon.rel='icon';icon.type='image/svg+xml';icon.href=new URL('favicon.svg',document.baseURI).href;
-    document.head.appendChild(icon);
+    const icon=document.createElement('link');icon.rel='icon';icon.type='image/svg+xml';icon.href=new URL('favicon.svg',document.baseURI).href;document.head.appendChild(icon);
   }
 
   const style=document.createElement('style');
@@ -35,30 +33,23 @@ export function installAnnotationCanvas(app: AnnotationBridge): void {
     @media(max-width:850px){.annotation-tools{gap:6px;padding:7px}.annotation-row,.annotation-more-panel{gap:5px}.annotation-tool-select{width:118px;min-width:0;max-width:118px;flex:0 0 118px}.annotation-tools label{font-size:10px}.annotation-tools input[type=range]{width:68px}.annotation-more-toggle{margin-left:0}#history.history-scroll{max-height:300px}}
   `;document.head.appendChild(style);
 
-  const tools=document.createElement('div');tools.className='annotation-tools';tools.innerHTML=`<div class="annotation-row"><select class="annotation-tool-select" aria-label="畫筆工具"><option value="off">關閉繪圖</option><option value="freehand">✏️ 畫筆</option><option value="line">／ 直線</option><option value="arrow">→ 箭頭線</option><option value="rectangle">▭ 方框</option></select><button type="button" class="annotation-more-toggle">更多</button><button type="button" class="annotation-eraser">橡皮擦</button><button type="button" class="annotation-undo">還原</button><button type="button" class="annotation-clear">清除</button></div><div class="annotation-more-panel"><label>顏色 <input class="annotation-color" type="color" value="#ff2d55"></label><label>透明度 <input class="annotation-opacity" type="range" min="10" max="100" value="75"><span class="annotation-opacity-value">75%</span></label><label>粗細 <input class="annotation-width" type="range" min="2" max="30" value="6"><span class="annotation-width-value">6</span></label></div>`;
+  const tools=document.createElement('div');tools.className='annotation-tools';tools.innerHTML=`<div class="annotation-row"><select class="annotation-tool-select" aria-label="畫筆工具"><option value="off">關閉繪圖</option><option value="freehand">✏️ 畫筆</option><option value="line">／ 直線</option><option value="arrow">→ 箭頭線</option><option value="rectangle">▭ 方框</option><option value="eraser">橡皮擦</option></select><button type="button" class="annotation-more-toggle">更多</button><button type="button" class="annotation-undo">還原</button><button type="button" class="annotation-clear">清除</button></div><div class="annotation-more-panel"><label>顏色 <input class="annotation-color" type="color" value="#ff2d55"></label><label>透明度 <input class="annotation-opacity" type="range" min="10" max="100" value="75"><span class="annotation-opacity-value">75%</span></label><label>粗細 <input class="annotation-width" type="range" min="2" max="30" value="6"><span class="annotation-width-value">6</span></label></div>`;
 
   const wrap=document.createElement('div');wrap.className='annotation-wrap';board.parentElement.insertBefore(wrap,board);wrap.appendChild(board);
-  const canvas=document.createElement('canvas');canvas.className='annotation-canvas';wrap.appendChild(canvas);const ctx=canvas.getContext('2d')!;
-  wrap.insertAdjacentElement('afterend',tools);
+  const canvas=document.createElement('canvas');canvas.className='annotation-canvas';wrap.appendChild(canvas);const ctx=canvas.getContext('2d')!;wrap.insertAdjacentElement('afterend',tools);
 
   const note=document.createElement('div');note.className='annotation-note';note.innerHTML=`<div class="annotation-note-title">說明文字</div><textarea maxlength="2000" placeholder="輸入推演想法、假設或備註……"></textarea><div class="annotation-note-actions"><button type="button" class="annotation-note-submit">加入紀錄</button></div><div class="annotation-note-hint">加入紀錄視同一次操作，會依發生順序加在操作紀錄最後。Ctrl + Enter 也可送出。</div>`;history?.parentElement?.appendChild(note);
   const noteInput=note.querySelector<HTMLTextAreaElement>('textarea')!,noteSubmit=note.querySelector<HTMLButtonElement>('.annotation-note-submit')!;
-
-  const toolSelect=tools.querySelector<HTMLSelectElement>('.annotation-tool-select')!;
-  const moreToggle=tools.querySelector<HTMLButtonElement>('.annotation-more-toggle')!;
-  const color=tools.querySelector<HTMLInputElement>('.annotation-color')!,opacity=tools.querySelector<HTMLInputElement>('.annotation-opacity')!,opacityValue=tools.querySelector<HTMLElement>('.annotation-opacity-value')!,width=tools.querySelector<HTMLInputElement>('.annotation-width')!,widthValue=tools.querySelector<HTMLElement>('.annotation-width-value')!,eraser=tools.querySelector<HTMLButtonElement>('.annotation-eraser')!,undo=tools.querySelector<HTMLButtonElement>('.annotation-undo')!,clear=tools.querySelector<HTMLButtonElement>('.annotation-clear')!;
+  const toolSelect=tools.querySelector<HTMLSelectElement>('.annotation-tool-select')!,moreToggle=tools.querySelector<HTMLButtonElement>('.annotation-more-toggle')!,color=tools.querySelector<HTMLInputElement>('.annotation-color')!,opacity=tools.querySelector<HTMLInputElement>('.annotation-opacity')!,opacityValue=tools.querySelector<HTMLElement>('.annotation-opacity-value')!,width=tools.querySelector<HTMLInputElement>('.annotation-width')!,widthValue=tools.querySelector<HTMLElement>('.annotation-width-value')!,undo=tools.querySelector<HTMLButtonElement>('.annotation-undo')!,clear=tools.querySelector<HTMLButtonElement>('.annotation-clear')!;
   let enabled=false,erase=false,drawing=false,tool:ToolKind='freehand',active:AnnotationShape|null=null;const shapes:AnnotationShape[]=[];
 
-  const timeline:TimelineEntry[]=[];let timelineSeq=0,lastActionCount=0;
-  const steps=document.querySelector<HTMLElement>('#steps');
-  const noteCount=()=>timeline.reduce((n,e)=>n+(e.type==='note'?1:0),0);
-  const syncStepCount=()=>{if(steps)steps.textContent=String(lastActionCount+noteCount())};
+  const timeline:TimelineEntry[]=[];let timelineSeq=0,lastActionCount=0;const steps=document.querySelector<HTMLElement>('#steps');
+  const noteCount=()=>timeline.reduce((n,e)=>n+(e.type==='note'?1:0),0);const syncStepCount=()=>{if(steps)steps.textContent=String(lastActionCount+noteCount())};
   const updateHistoryScroll=()=>{if(!history)return;requestAnimationFrame(()=>{const limit=window.innerWidth<=850?300:520;history.classList.toggle('history-scroll',history.scrollHeight>limit)})};
   const renderTimeline=(scrollBottom=false)=>{if(!history)return;history.replaceChildren();if(!timeline.length){history.textContent='目前沒有操作。'}else{for(const entry of timeline){const el=document.createElement('div');el.className='item'+(entry.type==='note'?' user-note':'');el.dataset.timelineManaged='1';el.dataset.timelineId=String(entry.id);el.textContent=entry.text;history.appendChild(el)}}syncStepCount();updateHistoryScroll();if(scrollBottom)requestAnimationFrame(()=>{history.scrollTop=history.scrollHeight})};
   const removeLatestActions=(count:number)=>{for(let removed=0;removed<count;){const i=timeline.map(e=>e.type).lastIndexOf('action');if(i<0)break;timeline.splice(i,1);removed++}};
   const captureLegacyHistory=()=>{if(!history)return;const raw=Array.from(history.querySelectorAll<HTMLElement>('.item:not([data-timeline-managed])'));if(!raw.length&&history.querySelector('[data-timeline-managed]'))return;const count=raw.length;if(count>lastActionCount){const added=raw.slice(0,count-lastActionCount).reverse();for(const el of added)timeline.push({id:++timelineSeq,type:'action',text:el.textContent?.trim()||''})}else if(count<lastActionCount){removeLatestActions(lastActionCount-count)}lastActionCount=count;renderTimeline(count>0)};
   if(history){const initial=Array.from(history.querySelectorAll<HTMLElement>('.item'));if(initial.length){for(const el of initial.reverse())timeline.push({id:++timelineSeq,type:'action',text:el.textContent?.trim()||''});lastActionCount=initial.length;renderTimeline()}new MutationObserver(()=>requestAnimationFrame(captureLegacyHistory)).observe(history,{childList:true,subtree:true,characterData:true})}
-
   const submitNote=()=>{const text=noteInput.value.trim();if(!text)return;timeline.push({id:++timelineSeq,type:'note',text});noteInput.value='';renderTimeline(true);noteInput.focus()};noteSubmit.onclick=submitNote;noteInput.addEventListener('keydown',e=>{if(e.ctrlKey&&e.key==='Enter'){e.preventDefault();submitNote()}});
   document.querySelector('#undo')?.addEventListener('click',e=>{const last=timeline[timeline.length-1];if(last?.type==='note'){e.preventDefault();e.stopImmediatePropagation();timeline.pop();renderTimeline(true)}},true);
 
@@ -71,10 +62,10 @@ export function installAnnotationCanvas(app: AnnotationBridge): void {
   const point=(e:PointerEvent):Point=>{const r=canvas.getBoundingClientRect();return{x:Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)),y:Math.max(0,Math.min(1,(e.clientY-r.top)/r.height))}};
   const styleSnapshot=():StrokeStyle=>({color:color.value,opacity:+opacity.value/100,width:+width.value,erase});
   const makeShape=(p:Point):AnnotationShape=>{const style=styleSnapshot();if(erase||tool==='freehand')return{kind:'freehand',points:[p],...style};if(tool==='line')return{kind:'line',start:p,end:p,...style};if(tool==='arrow')return{kind:'arrow',start:p,end:p,...style};return{kind:'rectangle',start:p,end:p,...style}};
-  const sync=()=>{if(!app.isPlayMode())enabled=false;canvas.classList.toggle('enabled',enabled&&app.isPlayMode());toolSelect.value=enabled&&!erase?tool:'off';eraser.classList.toggle('active',enabled&&app.isPlayMode()&&erase)};
-  toolSelect.addEventListener('change',()=>{const value=toolSelect.value;if(value==='off'){enabled=false;erase=false;drawing=false;active=null;redraw();sync();return}tool=value as ToolKind;enabled=true;erase=false;sync()});
+  const sync=()=>{if(!app.isPlayMode())enabled=false;canvas.classList.toggle('enabled',enabled&&app.isPlayMode());toolSelect.value=enabled?(erase?'eraser':tool):'off'};
+  toolSelect.addEventListener('change',()=>{const value=toolSelect.value;if(value==='off'){enabled=false;erase=false;drawing=false;active=null;redraw();sync();return}enabled=true;if(value==='eraser'){erase=true}else{erase=false;tool=value as ToolKind}drawing=false;active=null;redraw();sync()});
   moreToggle.onclick=()=>{tools.classList.toggle('more-open');moreToggle.classList.toggle('active',tools.classList.contains('more-open'));moreToggle.textContent=tools.classList.contains('more-open')?'收起':'更多'};
-  eraser.onclick=()=>{enabled=true;erase=!erase;if(!erase)enabled=false;drawing=false;active=null;redraw();sync()};opacity.oninput=()=>opacityValue.textContent=`${opacity.value}%`;width.oninput=()=>widthValue.textContent=width.value;undo.onclick=()=>{shapes.pop();redraw()};clear.onclick=()=>{shapes.length=0;active=null;redraw()};
+  opacity.oninput=()=>opacityValue.textContent=`${opacity.value}%`;width.oninput=()=>widthValue.textContent=width.value;undo.onclick=()=>{shapes.pop();redraw()};clear.onclick=()=>{shapes.length=0;active=null;redraw()};
   canvas.onpointerdown=e=>{if(!enabled||!app.isPlayMode())return;e.preventDefault();drawing=true;canvas.setPointerCapture?.(e.pointerId);active=makeShape(point(e))};
   canvas.onpointermove=e=>{if(!drawing||!active)return;e.preventDefault();const p=point(e);if(active.kind==='freehand')active.points.push(p);else active.end=p;redraw()};
   const finish=(e:PointerEvent)=>{if(!drawing)return;drawing=false;try{canvas.releasePointerCapture?.(e.pointerId)}catch{}if(active){const valid=active.kind==='freehand'?active.points.length>1:(Math.abs(active.start.x-active.end.x)+Math.abs(active.start.y-active.end.y)>0.002);if(valid)shapes.push(active)}active=null;redraw()};canvas.onpointerup=finish;canvas.onpointercancel=finish;
