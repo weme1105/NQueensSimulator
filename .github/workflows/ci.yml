@@ -10,8 +10,10 @@ on:
       - 'src/**'
       - 'e2e/**'
       - 'package.json'
+      - 'package-lock.json'
       - 'eslint.config.js'
       - 'playwright.config.ts'
+      - 'vitest.config.ts'
       - 'tsconfig.json'
       - 'vite.config.ts'
       - '.github/workflows/ci.yml'
@@ -21,8 +23,10 @@ on:
       - 'src/**'
       - 'e2e/**'
       - 'package.json'
+      - 'package-lock.json'
       - 'eslint.config.js'
       - 'playwright.config.ts'
+      - 'vitest.config.ts'
       - 'tsconfig.json'
       - 'vite.config.ts'
       - '.github/workflows/ci.yml'
@@ -35,9 +39,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: 'npm'
 
-      - name: Install dependencies
-        run: npm install
+      - name: Install dependencies reproducibly
+        run: npm ci
 
       - name: Lint
         run: npm run lint
@@ -48,7 +53,7 @@ jobs:
       - name: Unit tests
         run: npm test
 
-      - name: Unit test coverage
+      - name: Unit test coverage (70/70/70/70 gate)
         run: npm run test:coverage
 
       - name: Dependency audit
@@ -60,7 +65,7 @@ jobs:
       - name: Install Playwright Chromium and WebKit
         run: npx playwright install --with-deps chromium webkit
 
-      - name: Browser E2E tests
+      - name: Browser E2E tests against production preview
         run: npm run e2e
 
       - name: Upload Playwright report
@@ -96,7 +101,7 @@ jobs:
 
       - name: Legacy DOM smoke test
         run: |
-          npm install --no-save jsdom@26
+          npm install --no-save --package-lock=false jsdom@26
           node <<'JS'
           const fs=require('fs');
           const {JSDOM}=require('jsdom');
