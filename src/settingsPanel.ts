@@ -3,23 +3,23 @@ type SettingsBridge = {
 };
 
 type DisplaySettings = {
-  showRegions: boolean;
+  showRegionNumbers: boolean;
   showCoordinates: boolean;
 };
 
-const STORAGE_KEY = 'nq-display-settings-v1';
+const STORAGE_KEY = 'nq-display-settings-v2';
 
 function loadSettings(): DisplaySettings {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return { showRegions: true, showCoordinates: true };
+    if (!raw) return { showRegionNumbers: true, showCoordinates: true };
     const parsed = JSON.parse(raw) as Partial<DisplaySettings>;
     return {
-      showRegions: parsed.showRegions !== false,
+      showRegionNumbers: parsed.showRegionNumbers !== false,
       showCoordinates: parsed.showCoordinates !== false,
     };
   } catch {
-    return { showRegions: true, showCoordinates: true };
+    return { showRegionNumbers: true, showCoordinates: true };
   }
 }
 
@@ -36,9 +36,7 @@ export function installSettingsPanel(app: SettingsBridge): void {
     .nq-settings-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}.nq-settings-head b{font-size:18px}.nq-settings-close{width:36px;height:36px;padding:0;font-size:20px}
     .nq-settings-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px 0;border-top:1px solid #f0e5df}.nq-settings-row:first-of-type{border-top:0}.nq-settings-copy{display:flex;flex-direction:column;gap:3px}.nq-settings-copy small{opacity:.7;line-height:1.35}
     .nq-switch{position:relative;display:inline-flex;width:48px;height:28px;flex:0 0 auto}.nq-switch input{position:absolute;opacity:0;pointer-events:none}.nq-switch span{position:absolute;inset:0;border-radius:999px;background:#d8ccc7;transition:.18s}.nq-switch span::after{content:'';position:absolute;width:22px;height:22px;left:3px;top:3px;border-radius:50%;background:#fff;box-shadow:0 1px 4px #0003;transition:.18s}.nq-switch input:checked+span{background:#aa6b6b}.nq-switch input:checked+span::after{transform:translateX(20px)}
-    body.nq-play-mode.nq-hide-region-colors #board .cell:not(.unassigned){background:#fff!important;color:#5b4444!important}
-    body.nq-play-mode.nq-hide-region-colors #board .region-number{color:#6b5757!important;text-shadow:none!important}
-    body.nq-play-mode.nq-hide-region-colors #board .mark{color:#5b4444!important;text-shadow:none!important}
+    body.nq-hide-region-numbers #board .region-number{display:none!important}
     body.nq-hide-coordinates #board .cell-coordinate{display:none!important}
     @media(max-width:850px){.nq-settings-button{margin-left:0}.nq-settings-backdrop{padding:12px}.nq-settings-dialog{padding:14px}}
   `;
@@ -56,8 +54,8 @@ export function installSettingsPanel(app: SettingsBridge): void {
     <div class="nq-settings-dialog" role="dialog" aria-modal="true" aria-label="顯示設定">
       <div class="nq-settings-head"><b>顯示設定</b><button type="button" class="nq-settings-close" aria-label="關閉設定">×</button></div>
       <label class="nq-settings-row">
-        <span class="nq-settings-copy"><span>顯示色塊</span><small>關閉後推演模式保留區域邊界，但隱藏色塊顏色。</small></span>
-        <span class="nq-switch"><input type="checkbox" class="nq-show-regions"><span></span></span>
+        <span class="nq-settings-copy"><span>顯示色塊號碼</span><small>控制色塊中央的 Region 編號顯示；色塊顏色與邊界不受影響。</small></span>
+        <span class="nq-switch"><input type="checkbox" class="nq-show-region-numbers"><span></span></span>
       </label>
       <label class="nq-settings-row">
         <span class="nq-settings-copy"><span>顯示座標</span><small>控制棋盤格內的 (X,Y) 座標顯示。</small></span>
@@ -67,14 +65,14 @@ export function installSettingsPanel(app: SettingsBridge): void {
   document.body.appendChild(backdrop);
 
   const close = backdrop.querySelector<HTMLButtonElement>('.nq-settings-close')!;
-  const showRegions = backdrop.querySelector<HTMLInputElement>('.nq-show-regions')!;
+  const showRegionNumbers = backdrop.querySelector<HTMLInputElement>('.nq-show-region-numbers')!;
   const showCoordinates = backdrop.querySelector<HTMLInputElement>('.nq-show-coordinates')!;
   let settings = loadSettings();
 
   const apply = (): void => {
-    document.body.classList.toggle('nq-hide-region-colors', !settings.showRegions);
+    document.body.classList.toggle('nq-hide-region-numbers', !settings.showRegionNumbers);
     document.body.classList.toggle('nq-hide-coordinates', !settings.showCoordinates);
-    showRegions.checked = settings.showRegions;
+    showRegionNumbers.checked = settings.showRegionNumbers;
     showCoordinates.checked = settings.showCoordinates;
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(settings)); } catch { /* web storage may be unavailable */ }
   };
@@ -86,7 +84,7 @@ export function installSettingsPanel(app: SettingsBridge): void {
   close.addEventListener('click', hide);
   backdrop.addEventListener('click', (event) => { if (event.target === backdrop) hide(); });
   document.addEventListener('keydown', (event) => { if (event.key === 'Escape' && backdrop.classList.contains('open')) hide(); });
-  showRegions.addEventListener('change', () => { settings = { ...settings, showRegions: showRegions.checked }; apply(); });
+  showRegionNumbers.addEventListener('change', () => { settings = { ...settings, showRegionNumbers: showRegionNumbers.checked }; apply(); });
   showCoordinates.addEventListener('change', () => { settings = { ...settings, showCoordinates: showCoordinates.checked }; apply(); });
 
   new MutationObserver(() => {
