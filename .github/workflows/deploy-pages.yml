@@ -121,11 +121,11 @@ jobs:
         working-directory: prod-src
         run: npm run build
 
-      - name: Install PROD Playwright Chromium when available
+      - name: Install PROD Playwright browsers when available
         working-directory: prod-src
         run: |
           if npm pkg get scripts.e2e | grep -qv null; then
-            npx playwright install --with-deps chromium
+            npx playwright install --with-deps chromium webkit
           fi
 
       - name: E2E PROD when available
@@ -167,10 +167,10 @@ jobs:
         working-directory: dev-src
         run: npm run build:dev
 
-      - name: Install DEV Playwright Chromium
+      - name: Install DEV Playwright Chromium and WebKit
         if: steps.dev.outputs.exists == 'true'
         working-directory: dev-src
-        run: npx playwright install --with-deps chromium
+        run: npx playwright install --with-deps chromium webkit
 
       - name: E2E DEV
         if: steps.dev.outputs.exists == 'true'
