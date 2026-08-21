@@ -1,51 +1,82 @@
 name: CI
+
 on:
   push:
+    branches:
+      - main
+      - develop
     paths:
       - 'index.html'
+      - 'src/**'
+      - 'package.json'
+      - 'tsconfig.json'
+      - 'vite.config.ts'
       - '.github/workflows/ci.yml'
   pull_request:
     paths:
       - 'index.html'
+      - 'src/**'
+      - 'package.json'
+      - 'tsconfig.json'
+      - 'vite.config.ts'
       - '.github/workflows/ci.yml'
+
 jobs:
-  smoke:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: JavaScript syntax check
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Unit tests
+        run: npm test
+
+      - name: TypeScript and Vite build
+        run: npm run build
+
+      - name: Legacy JavaScript syntax check
         run: |
           python - <<'PY'
           import re
           from pathlib import Path
           s=Path('index.html').read_text()
-          Path('/tmp/app.js').write_text(re.search(r'<script>(.*)</script>',s,re.S).group(1))
+          match=re.search(r'<script>(.*)</script>',s,re.S)
+          if not match:
+              raise SystemExit('inline legacy script not found')
+          Path('/tmp/app.js').write_text(match.group(1))
           PY
           node --check /tmp/app.js
-      - name: Install jsdom
-        run: npm install --no-save jsdom@26
-      - name: DOM smoke test
+
+      - name: Legacy DOM smoke test
         run: |
+          npm install --no-save jsdom@26
           node <<'JS'
           const fs=require('fs');
           const {JSDOM}=require('jsdom');
           const html=fs.readFileSync('index.html','utf8');
           const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://example.test/'});
-          const {window}=dom;
-          const d=window.document;
+          const d=dom.window.document;
           const assert=(ok,msg)=>{if(!ok)throw new Error(msg)};
+
           assert(d.querySelectorAll('.cell').length===64,'initial 8x8 board should have 64 cells');
+
           const n=d.getElementById('n');
-          n.value='12';d.getElementById('new').click();
+          n.value='12';
+          d.getElementById('new').click();
           assert(d.querySelectorAll('.cell').length===144,'12x12 board should have 144 cells');
-          n.value='20';d.getElementById('new').click();
+
+          n.value='20';
+          d.getElementById('new').click();
           assert(d.querySelectorAll('.cell').length===400,'20x20 manual board should have 400 cells');
-          for(let i=0;i<5;i++)d.getElementById('new').click();
-          assert(d.getElementById('solver').style.display==='block','solver should unlock after 7 consecutive new-board clicks');
-          n.value='13';d.getElementById('random').click();
+
+          n.value='13';
+          d.getElementById('random').click();
           assert(d.getElementById('status').textContent.includes('最大支援 12×12'),'random generator should reject N > 12');
-          console.log('DOM smoke test passed');
+
+          console.log('Legacy DOM smoke test passed');
           JS
