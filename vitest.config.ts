@@ -7,6 +7,15 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'html', 'json-summary'],
+      include: [
+        'src/solver/engine.ts',
+        'src/solver/generator.ts',
+        'src/solver/pipeline.ts',
+        'src/solver/types.ts',
+        'src/puzzleRules.ts',
+        'src/regionEditRules.ts',
+        'src/playPointerGuard.ts',
+      ],
       thresholds: {
         statements: 70,
         branches: 70,
