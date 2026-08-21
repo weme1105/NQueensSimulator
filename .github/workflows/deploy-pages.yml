@@ -97,9 +97,25 @@ jobs:
         working-directory: prod-src
         run: npm install
 
+      - name: Lint PROD
+        working-directory: prod-src
+        run: npm run lint
+
+      - name: Typecheck PROD
+        working-directory: prod-src
+        run: npm run typecheck
+
       - name: Test PROD
         working-directory: prod-src
         run: npm test
+
+      - name: Coverage PROD
+        working-directory: prod-src
+        run: npm run test:coverage
+
+      - name: Audit PROD dependencies
+        working-directory: prod-src
+        run: npm run audit
 
       - name: Build PROD
         working-directory: prod-src
@@ -110,10 +126,30 @@ jobs:
         working-directory: dev-src
         run: npm install
 
+      - name: Lint DEV
+        if: steps.dev.outputs.exists == 'true'
+        working-directory: dev-src
+        run: npm run lint
+
+      - name: Typecheck DEV
+        if: steps.dev.outputs.exists == 'true'
+        working-directory: dev-src
+        run: npm run typecheck
+
       - name: Test DEV
         if: steps.dev.outputs.exists == 'true'
         working-directory: dev-src
         run: npm test
+
+      - name: Coverage DEV
+        if: steps.dev.outputs.exists == 'true'
+        working-directory: dev-src
+        run: npm run test:coverage
+
+      - name: Audit DEV dependencies
+        if: steps.dev.outputs.exists == 'true'
+        working-directory: dev-src
+        run: npm run audit
 
       - name: Build DEV for /dev/
         if: steps.dev.outputs.exists == 'true'
