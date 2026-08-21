@@ -38,8 +38,13 @@ export function installSettingsPanel(app: SettingsBridge): void {
     .nq-settings-row{display:flex;align-items:center;justify-content:space-between;gap:16px;cursor:pointer}.nq-switch{position:relative;display:inline-flex;width:48px;height:28px;flex:0 0 auto}.nq-switch input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}.nq-switch span{position:absolute;inset:0;border-radius:999px;background:#d8ccc7;transition:.18s;pointer-events:none}.nq-switch span::after{content:'';position:absolute;width:22px;height:22px;left:3px;top:3px;border-radius:50%;background:#fff;box-shadow:0 1px 4px #0003;transition:.18s}.nq-switch input:checked+span{background:#aa6b6b}.nq-switch input:checked+span::after{transform:translateX(20px)}
     body.nq-region-colors-only #board .region-number{display:none!important}
     body.nq-region-numbers-only #board .cell:not(.unassigned){background:#fff!important;color:#5b4444!important}
-    body.nq-region-numbers-only #board .region-number{color:#6b5757!important;text-shadow:none!important}
+    body.nq-region-numbers-only #board .region-number{color:#6b5757!important;text-shadow:none!important;font-weight:800}
     body.nq-region-numbers-only #board .mark{color:#5b4444!important;text-shadow:none!important}
+    body.nq-region-numbers-only #board .cell:has(.mark:not(:empty)){background-image:repeating-linear-gradient(135deg,rgba(91,68,68,.11) 0,rgba(91,68,68,.11) 2px,transparent 2px,transparent 8px)!important}
+    body.nq-region-numbers-only #board .cell:has(.mark:not(:empty)) .mark{font-size:0!important}
+    body.nq-region-numbers-only #board .cell:has(.mark:not(:empty)) .mark::after{content:''}
+    body.nq-region-numbers-only #board .cell:has(.queen),body.nq-region-numbers-only #board .cell:has(.crown){background-image:none!important}
+    body.nq-region-numbers-only #board .cell:has(.queen) .mark,body.nq-region-numbers-only #board .cell:has(.crown) .mark{font-size:inherit!important}
     body.nq-hide-coordinates #board .cell-coordinate{display:none!important}
     @media(max-width:850px){.nq-settings-button{margin-left:0}.nq-settings-backdrop{padding:12px}.nq-settings-dialog{padding:14px}}
   `;
