@@ -60,6 +60,35 @@ test('display settings switch region modes and coordinate visibility', async ({ 
   await expect(page.locator('body')).not.toHaveClass(/nq-hide-coordinates/);
 });
 
+test('display settings persist after reload', async ({ page }) => {
+  await page.locator('.nq-settings-button').click();
+  await page.locator('.nq-region-select').selectOption('numbers');
+  await page.locator('.nq-show-coordinates').uncheck();
+  await page.reload();
+  await expect(page.locator('#board .cell')).toHaveCount(64);
+  await expect(page.locator('body')).toHaveClass(/nq-region-numbers-only/);
+  await expect(page.locator('body')).toHaveClass(/nq-hide-coordinates/);
+  await page.locator('.nq-settings-button').click();
+  await expect(page.locator('.nq-region-select')).toHaveValue('numbers');
+  await expect(page.locator('.nq-show-coordinates')).not.toBeChecked();
+});
+
+test('settings dialog closes through close button, backdrop and Escape', async ({ page }) => {
+  const button = page.locator('.nq-settings-button');
+  const backdrop = page.locator('.nq-settings-backdrop');
+  await button.click();
+  await page.locator('.nq-settings-close').click();
+  await expect(backdrop).not.toHaveClass(/open/);
+
+  await button.click();
+  await backdrop.click({ position: { x: 4, y: 4 } });
+  await expect(backdrop).not.toHaveClass(/open/);
+
+  await button.click();
+  await page.keyboard.press('Escape');
+  await expect(backdrop).not.toHaveClass(/open/);
+});
+
 test('play-only tips appear in global app bar and close when leaving play mode', async ({ page }) => {
   await expect(page.locator('.nq-rule-tip')).not.toBeVisible();
   await expect(page.locator('.nq-operation-tip')).not.toBeVisible();
@@ -92,6 +121,17 @@ test('annotation More panel exposes drawing appearance controls', async ({ page 
   await page.locator('.annotation-more-toggle').click();
   await expect(tools).not.toHaveClass(/more-open/);
   await expect(page.locator('.annotation-more-panel')).not.toBeVisible();
+});
+
+test('annotation appearance controls update their displayed values', async ({ page }) => {
+  await enterPlayMode(page);
+  await page.locator('.annotation-more-toggle').click();
+  await page.locator('.annotation-opacity').fill('42');
+  await expect(page.locator('.annotation-opacity-value')).toHaveText('42%');
+  await page.locator('.annotation-width').fill('14');
+  await expect(page.locator('.annotation-width-value')).toHaveText('14');
+  await page.locator('.annotation-color').fill('#123456');
+  await expect(page.locator('.annotation-color')).toHaveValue('#123456');
 });
 
 test('annotation primary row keeps only dropdown, More, Undo and Clear', async ({ page }) => {
