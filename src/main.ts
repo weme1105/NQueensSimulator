@@ -8,6 +8,7 @@ import { installRegionColors } from './regionColors';
 import { installSolverButtonLayout } from './solverButtonLayout';
 import { installUiLayout } from './uiLayout';
 import { installSecretUnlock } from './secretUnlock';
+import { installSettingsPanel } from './settingsPanel';
 import { SolverWorkerClient } from './solver/workerClient';
 import { CellState, type BoardSnapshot, type DeductionResult } from './solver/types';
 
@@ -38,6 +39,7 @@ installRegionColors(app);
 installSolverButtonLayout();
 installFreeRegionEditor(app);
 installUiLayout(app);
+installSettingsPanel(app);
 installSecretUnlock();
 const deductionHighlight = installDeductionHighlight();
 
