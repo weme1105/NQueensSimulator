@@ -5,31 +5,7 @@ on:
     branches:
       - main
       - develop
-    paths:
-      - 'index.html'
-      - 'src/**'
-      - 'e2e/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'eslint.config.js'
-      - 'playwright.config.ts'
-      - 'vitest.config.ts'
-      - 'tsconfig.json'
-      - 'vite.config.ts'
-      - '.github/workflows/ci.yml'
   pull_request:
-    paths:
-      - 'index.html'
-      - 'src/**'
-      - 'e2e/**'
-      - 'package.json'
-      - 'package-lock.json'
-      - 'eslint.config.js'
-      - 'playwright.config.ts'
-      - 'vitest.config.ts'
-      - 'tsconfig.json'
-      - 'vite.config.ts'
-      - '.github/workflows/ci.yml'
 
 jobs:
   verify:
