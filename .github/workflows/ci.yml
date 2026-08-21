@@ -9,6 +9,7 @@ on:
       - 'index.html'
       - 'src/**'
       - 'package.json'
+      - 'eslint.config.js'
       - 'tsconfig.json'
       - 'vite.config.ts'
       - '.github/workflows/ci.yml'
@@ -17,6 +18,7 @@ on:
       - 'index.html'
       - 'src/**'
       - 'package.json'
+      - 'eslint.config.js'
       - 'tsconfig.json'
       - 'vite.config.ts'
       - '.github/workflows/ci.yml'
@@ -33,10 +35,22 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Lint
+        run: npm run lint
+
+      - name: TypeScript typecheck
+        run: npm run typecheck
+
       - name: Unit tests
         run: npm test
 
-      - name: TypeScript and Vite build
+      - name: Unit test coverage
+        run: npm run test:coverage
+
+      - name: Dependency audit
+        run: npm run audit
+
+      - name: Production build
         run: npm run build
 
       - name: Legacy JavaScript syntax check
