@@ -1,0 +1,64 @@
+name: Post-deploy smoke
+
+on:
+  workflow_run:
+    workflows: ['Deploy GitHub Pages']
+    types: [completed]
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    if: github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify production and DEV endpoints
+        env:
+          PROD_URL: https://weme1105.github.io/NQueensSimulator/
+          DEV_URL: https://weme1105.github.io/NQueensSimulator/dev/
+          MANIFEST_URL: https://weme1105.github.io/NQueensSimulator/deployment-version.txt
+          DEV_VERSION_URL: https://weme1105.github.io/NQueensSimulator/dev/dev-version.txt
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+          HEAD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -euo pipefail
+
+          fetch_with_retry() {
+            url="$1"
+            out="$2"
+            for attempt in 1 2 3 4 5; do
+              if curl --fail --silent --show-error --location --max-time 20 "$url" -o "$out"; then
+                return 0
+              fi
+              echo "Attempt $attempt failed for $url; retrying..."
+              sleep $((attempt * 10))
+            done
+            return 1
+          }
+
+          fetch_with_retry "$PROD_URL" /tmp/prod.html
+          fetch_with_retry "$DEV_URL" /tmp/dev.html
+          fetch_with_retry "$MANIFEST_URL" /tmp/deployment-version.txt
+          fetch_with_retry "$DEV_VERSION_URL" /tmp/dev-version.txt
+
+          grep -q '<div id="board" class="board"' /tmp/prod.html
+          grep -q '<div id="board" class="board"' /tmp/dev.html
+          grep -q '^PROD_SHA=' /tmp/deployment-version.txt
+          grep -q '^DEV_SHA=' /tmp/deployment-version.txt
+          grep -q '^DEV_SHA=' /tmp/dev-version.txt
+
+          PROD_SHA="$(sed -n 's/^PROD_SHA=//p' /tmp/deployment-version.txt)"
+          DEV_SHA="$(sed -n 's/^DEV_SHA=//p' /tmp/deployment-version.txt)"
+
+          if [ "$HEAD_BRANCH" = "main" ] && [ "$PROD_SHA" != "$HEAD_SHA" ]; then
+            echo "Production SHA mismatch: expected $HEAD_SHA, got $PROD_SHA"
+            exit 1
+          fi
+
+          if [ "$HEAD_BRANCH" = "develop" ] && [ "$DEV_SHA" != "$HEAD_SHA" ]; then
+            echo "DEV SHA mismatch: expected $HEAD_SHA, got $DEV_SHA"
+            exit 1
+          fi
+
+          echo "Post-deploy smoke passed. PROD=$PROD_SHA DEV=$DEV_SHA"
