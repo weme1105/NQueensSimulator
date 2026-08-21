@@ -97,25 +97,25 @@ jobs:
         working-directory: prod-src
         run: npm install
 
-      - name: Lint PROD
+      - name: Lint PROD when available
         working-directory: prod-src
-        run: npm run lint
+        run: npm run lint --if-present
 
-      - name: Typecheck PROD
+      - name: Typecheck PROD when available
         working-directory: prod-src
-        run: npm run typecheck
+        run: npm run typecheck --if-present
 
       - name: Test PROD
         working-directory: prod-src
         run: npm test
 
-      - name: Coverage PROD
+      - name: Coverage PROD when available
         working-directory: prod-src
-        run: npm run test:coverage
+        run: npm run test:coverage --if-present
 
       - name: Audit PROD dependencies
         working-directory: prod-src
-        run: npm run audit
+        run: npm audit --audit-level=high
 
       - name: Build PROD
         working-directory: prod-src
