@@ -121,8 +121,11 @@ export function installSettingsPanel(app: SettingsBridge): void {
     apply();
   });
 
+  let wasPlayMode = app.isPlayMode();
   new MutationObserver(() => {
-    if (!app.isPlayMode()) backdrop.classList.remove('open');
+    const isPlayMode = app.isPlayMode();
+    if (wasPlayMode && !isPlayMode) backdrop.classList.remove('open');
+    wasPlayMode = isPlayMode;
   }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
 
   apply();
