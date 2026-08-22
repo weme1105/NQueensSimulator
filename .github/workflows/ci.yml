@@ -67,11 +67,14 @@ jobs:
           python - <<'PY'
           import re
           from pathlib import Path
-          s=Path('index.html').read_text()
-          match=re.search(r'<script>(.*)</script>',s,re.S)
+          s = Path('index.html').read_text()
+          match = re.search(r'<script(?:\s[^>]*)?>(.*?)</script>', s, re.S | re.I)
           if not match:
               raise SystemExit('inline legacy script not found')
-          Path('/tmp/app.js').write_text(match.group(1))
+          script = match.group(1).strip()
+          if not script:
+              raise SystemExit('inline legacy script is empty')
+          Path('/tmp/app.js').write_text(script)
           PY
           node --check /tmp/app.js
 
