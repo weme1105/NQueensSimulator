@@ -23,8 +23,56 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-site:
+  quality-gate:
+    name: Wait for CI
     runs-on: ubuntu-latest
+    steps:
+      - name: Wait for matching CI run
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          echo "Waiting for CI result for ${COMMIT_SHA}"
+          for attempt in $(seq 1 90); do
+            RESPONSE="$(curl -fsS \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${COMMIT_SHA}&per_page=20")"
+            RUN="$(printf '%s' "$RESPONSE" | jq -c '[.workflow_runs[] | select(.event == "push")] | first // empty')"
+            if [ -z "$RUN" ]; then
+              echo "CI run not visible yet (${attempt}/90)"
+              sleep 10
+              continue
+            fi
+            STATUS="$(printf '%s' "$RUN" | jq -r '.status')"
+            CONCLUSION="$(printf '%s' "$RUN" | jq -r '.conclusion // ""')"
+            URL="$(printf '%s' "$RUN" | jq -r '.html_url')"
+            echo "CI: status=${STATUS} conclusion=${CONCLUSION} ${URL}"
+            if [ "$STATUS" != "completed" ]; then
+              sleep 10
+              continue
+            fi
+            if [ "$CONCLUSION" != "success" ]; then
+              echo "CI gate rejected deployment: ${CONCLUSION}"
+              exit 1
+            fi
+            echo "CI gate passed."
+            exit 0
+          done
+          echo "Timed out waiting for matching CI run."
+          exit 1
+
+      - name: Manual deployment notice
+        if: github.event_name == 'workflow_dispatch'
+        run: echo 'Manual deployment explicitly bypasses the automatic CI wait gate.'
+
+  build-site:
+    name: Build Pages artifact
+    runs-on: ubuntu-latest
+    needs: quality-gate
     steps:
       - name: Resolve PROD source ref
         id: prod
@@ -93,105 +141,40 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install PROD dependencies
+      - name: Install PROD build dependencies
         working-directory: prod-src
-        run: npm install
-
-      - name: Lint PROD when available
-        working-directory: prod-src
-        run: npm run lint --if-present
-
-      - name: Typecheck PROD when available
-        working-directory: prod-src
-        run: npm run typecheck --if-present
-
-      - name: Test PROD
-        working-directory: prod-src
-        run: npm test
-
-      - name: Coverage PROD when available
-        working-directory: prod-src
-        run: npm run test:coverage --if-present
-
-      - name: Audit PROD dependencies
-        working-directory: prod-src
-        run: npm audit --audit-level=high
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
       - name: Build PROD
         working-directory: prod-src
         run: npm run build
 
-      - name: Install PROD Playwright browsers when available
-        working-directory: prod-src
-        run: |
-          if npm pkg get scripts.e2e | grep -qv null; then
-            npx playwright install --with-deps chromium webkit
-          fi
-
-      - name: E2E PROD when available
-        working-directory: prod-src
-        run: npm run e2e --if-present
-
-      - name: Install DEV dependencies
+      - name: Install DEV build dependencies
         if: steps.dev.outputs.exists == 'true'
         working-directory: dev-src
-        run: npm install
-
-      - name: Lint DEV
-        if: steps.dev.outputs.exists == 'true'
-        working-directory: dev-src
-        run: npm run lint
-
-      - name: Typecheck DEV
-        if: steps.dev.outputs.exists == 'true'
-        working-directory: dev-src
-        run: npm run typecheck
-
-      - name: Test DEV
-        if: steps.dev.outputs.exists == 'true'
-        working-directory: dev-src
-        run: npm test
-
-      - name: Coverage DEV
-        if: steps.dev.outputs.exists == 'true'
-        working-directory: dev-src
-        run: npm run test:coverage
-
-      - name: Audit DEV dependencies
-        if: steps.dev.outputs.exists == 'true'
-        working-directory: dev-src
-        run: npm run audit
+        run: npm ci
 
       - name: Build DEV for /dev/
         if: steps.dev.outputs.exists == 'true'
         working-directory: dev-src
         run: npm run build:dev
 
-      - name: Install DEV Playwright Chromium and WebKit
-        if: steps.dev.outputs.exists == 'true'
-        working-directory: dev-src
-        run: npx playwright install --with-deps chromium webkit
-
-      - name: E2E DEV
-        if: steps.dev.outputs.exists == 'true'
-        working-directory: dev-src
-        run: npm run e2e
-
-      - name: Compose production site directly from main build
+      - name: Compose production site from main build
         run: |
           rm -rf site
           mkdir -p site
           cp -R prod-src/dist/. site/
-          cp prod-src/favicon.svg site/favicon.svg
+          if [ -f prod-src/favicon.svg ]; then cp prod-src/favicon.svg site/favicon.svg; fi
           if [ -f prod-src/changelog.html ]; then cp prod-src/changelog.html site/changelog.html; fi
 
-      - name: Compose DEV site directly from develop build
+      - name: Compose DEV site from develop build
         if: steps.dev.outputs.exists == 'true'
         run: |
           rm -rf site/dev
           mkdir -p site/dev
           cp -R dev-src/dist/. site/dev/
-          cp dev-src/favicon.svg site/dev/favicon.svg
+          if [ -f dev-src/favicon.svg ]; then cp dev-src/favicon.svg site/dev/favicon.svg; fi
           if [ -f dev-src/changelog.html ]; then cp dev-src/changelog.html site/dev/changelog.html; fi
           printf 'DEV_BRANCH=develop\nDEV_SHA=%s\n' "$(git -C dev-src rev-parse HEAD)" > site/dev/dev-version.txt
 
@@ -201,7 +184,7 @@ jobs:
           rm -rf site/dev
           mkdir -p site/dev
           cp -R prod-src/dist/. site/dev/
-          cp prod-src/favicon.svg site/dev/favicon.svg
+          if [ -f prod-src/favicon.svg ]; then cp prod-src/favicon.svg site/dev/favicon.svg; fi
           printf 'DEV_BRANCH=main\nDEV_SHA=%s\n' "$(git -C prod-src rev-parse HEAD)" > site/dev/dev-version.txt
 
       - name: Write deployment manifest
@@ -215,6 +198,7 @@ jobs:
             DEV_SOURCE="main"
           fi
           printf 'PROD_BRANCH=main\nPROD_SHA=%s\nDEV_SOURCE=%s\nDEV_SHA=%s\n' "$PROD_SHA" "$DEV_SOURCE" "$DEV_SHA" > site/deployment-version.txt
+          cat site/deployment-version.txt
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -225,6 +209,7 @@ jobs:
           path: ./site
 
   deploy:
+    name: Publish Pages
     environment:
       name: github-pages
       url: ${{ steps.deployment1.outputs.page_url }}
@@ -260,4 +245,33 @@ jobs:
         if: steps.deployment1.outcome == 'failure' && steps.deployment2.outcome == 'failure' && steps.deployment3.outcome == 'failure'
         run: |
           echo 'GitHub Pages deployment failed after 3 attempts.'
+          exit 1
+
+  smoke:
+    name: Post-deploy smoke test
+    runs-on: ubuntu-latest
+    needs: deploy
+    steps:
+      - name: Verify PROD and DEV endpoints
+        env:
+          ROOT_URL: https://weme1105.github.io/NQueensSimulator/
+          DEV_URL: https://weme1105.github.io/NQueensSimulator/dev/
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 12); do
+            if curl -fsS --retry 2 --retry-delay 2 "$ROOT_URL" >/tmp/prod.html \
+              && curl -fsS --retry 2 --retry-delay 2 "$DEV_URL" >/tmp/dev.html \
+              && curl -fsS --retry 2 --retry-delay 2 "${ROOT_URL}deployment-version.txt" >/tmp/version.txt; then
+              grep -q '<div id="board"' /tmp/prod.html
+              grep -q '<div id="board"' /tmp/dev.html
+              grep -q '^PROD_SHA=' /tmp/version.txt
+              grep -q '^DEV_SHA=' /tmp/version.txt
+              echo 'Post-deploy smoke test passed.'
+              cat /tmp/version.txt
+              exit 0
+            fi
+            echo "Pages not ready yet (${attempt}/12); retrying..."
+            sleep 10
+          done
+          echo 'Post-deploy smoke test failed.'
           exit 1
