@@ -21,6 +21,10 @@ async function enterPlayMode(page: Page): Promise<void> {
   await expect(page.locator('body')).toHaveClass(/nq-play-mode/, { timeout: 15_000 });
 }
 
+function settingsButton(page: Page) {
+  return page.locator('.nq-app-bar .nq-settings-button');
+}
+
 test.beforeEach(async ({ page }) => {
   await page.goto('/');
   await expect(page.locator('#board .cell')).toHaveCount(64);
@@ -28,15 +32,16 @@ test.beforeEach(async ({ page }) => {
 
 test('global settings live in the app bar instead of puzzle toolbar', async ({ page }) => {
   const appBar = page.locator('.nq-app-bar');
-  const settings = page.locator('.nq-settings-button');
+  const settings = settingsButton(page);
   await expect(appBar).toBeVisible();
+  await expect(settings).toHaveCount(1);
   await expect(settings).toBeVisible();
-  await expect(appBar.locator('.nq-settings-button')).toHaveCount(1);
+  await expect(page.locator('.nq-settings-button')).toHaveCount(1);
   await expect(page.locator('.toolbar .nq-settings-button')).toHaveCount(0);
 });
 
 test('display settings switch region modes and coordinate visibility', async ({ page }) => {
-  await page.locator('.nq-settings-button').click();
+  await settingsButton(page).click();
   await expect(page.locator('.nq-settings-backdrop')).toHaveClass(/open/);
 
   const regionSelect = page.locator('.nq-region-select');
@@ -61,20 +66,20 @@ test('display settings switch region modes and coordinate visibility', async ({ 
 });
 
 test('display settings persist after reload', async ({ page }) => {
-  await page.locator('.nq-settings-button').click();
+  await settingsButton(page).click();
   await page.locator('.nq-region-select').selectOption('numbers');
   await page.locator('.nq-show-coordinates').uncheck();
   await page.reload();
   await expect(page.locator('#board .cell')).toHaveCount(64);
   await expect(page.locator('body')).toHaveClass(/nq-region-numbers-only/);
   await expect(page.locator('body')).toHaveClass(/nq-hide-coordinates/);
-  await page.locator('.nq-settings-button').click();
+  await settingsButton(page).click();
   await expect(page.locator('.nq-region-select')).toHaveValue('numbers');
   await expect(page.locator('.nq-show-coordinates')).not.toBeChecked();
 });
 
 test('settings dialog closes through close button, backdrop and Escape', async ({ page }) => {
-  const button = page.locator('.nq-settings-button');
+  const button = settingsButton(page);
   const backdrop = page.locator('.nq-settings-backdrop');
   await button.click();
   await page.locator('.nq-settings-close').click();
@@ -99,6 +104,7 @@ test('play-only tips appear in global app bar and close when leaving play mode',
 
   await page.locator('.nq-operation-tip').click();
   await expect(page.locator('.nq-operation-panel')).toHaveClass(/open/);
+  await expect(page.locator('#play')).toBeVisible();
 
   await page.locator('#play').click();
   await expect(page.locator('body')).not.toHaveClass(/nq-play-mode/);
@@ -145,11 +151,16 @@ test('annotation primary row keeps only dropdown, More, Undo and Clear', async (
 });
 
 test('board size picker respects 4 to 20 limits', async ({ page }) => {
-  for (let i = 0; i < 10; i++) await page.locator('.nq-size-minus').click();
-  await expect(page.locator('.nq-size-current')).toHaveText('4');
-  await expect(page.locator('.nq-size-minus')).toBeDisabled();
+  const minus = page.locator('.nq-size-minus');
+  const plus = page.locator('.nq-size-plus');
+  const current = page.locator('.nq-size-current');
 
-  for (let i = 0; i < 20; i++) await page.locator('.nq-size-plus').click();
-  await expect(page.locator('.nq-size-current')).toHaveText('20');
-  await expect(page.locator('.nq-size-plus')).toBeDisabled();
+  await expect(current).toHaveText('8');
+  for (let i = 0; i < 4; i++) await minus.click();
+  await expect(current).toHaveText('4');
+  await expect(minus).toBeDisabled();
+
+  for (let i = 0; i < 16; i++) await plus.click();
+  await expect(current).toHaveText('20');
+  await expect(plus).toBeDisabled();
 });
