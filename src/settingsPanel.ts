@@ -9,6 +9,7 @@ type DisplaySettings = {
 };
 
 const STORAGE_KEY = 'nq-display-settings-v3';
+const INSTALL_MARKER = 'nqSettingsInstalled';
 
 function loadSettings(): DisplaySettings {
   try {
@@ -25,6 +26,16 @@ function loadSettings(): DisplaySettings {
 export function installSettingsPanel(app: SettingsBridge): void {
   const toolbar = document.querySelector<HTMLElement>('.toolbar');
   if (!toolbar) return;
+
+  const existingButton = document.querySelector<HTMLButtonElement>('.nq-settings-button');
+  const existingBackdrop = document.querySelector<HTMLElement>('.nq-settings-backdrop');
+  if (document.body.dataset[INSTALL_MARKER] === 'true' || (existingButton && existingBackdrop)) {
+    document.body.dataset[INSTALL_MARKER] = 'true';
+    return;
+  }
+
+  document.querySelectorAll('.nq-settings-button, .nq-settings-backdrop').forEach((element) => element.remove());
+  document.body.dataset[INSTALL_MARKER] = 'true';
 
   const style = document.createElement('style');
   style.textContent = `
