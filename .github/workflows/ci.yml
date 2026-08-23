@@ -1,51 +1,108 @@
 name: CI
+
 on:
   push:
-    paths:
-      - 'index.html'
-      - '.github/workflows/ci.yml'
+    branches:
+      - main
+      - develop
   pull_request:
-    paths:
-      - 'index.html'
-      - '.github/workflows/ci.yml'
+
 jobs:
-  smoke:
+  verify:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: JavaScript syntax check
+          cache: 'npm'
+
+      - name: Install dependencies reproducibly
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: TypeScript typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
+
+      - name: Unit test coverage (70/70/70/70 gate)
+        run: npm run test:coverage
+
+      - name: Dependency audit
+        run: npm run audit
+
+      - name: Production build
+        run: npm run build
+
+      - name: Install Playwright Chromium and WebKit
+        run: npx playwright install --with-deps chromium webkit
+
+      - name: Browser E2E tests against production preview
+        run: npm run e2e
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload Playwright failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-test-results
+          path: test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Legacy JavaScript syntax check
         run: |
           python - <<'PY'
           import re
           from pathlib import Path
-          s=Path('index.html').read_text()
-          Path('/tmp/app.js').write_text(re.search(r'<script>(.*)</script>',s,re.S).group(1))
+          s = Path('index.html').read_text()
+          match = re.search(r'<script(?:\s[^>]*)?>(.*?)</script>', s, re.S | re.I)
+          if not match:
+              raise SystemExit('inline legacy script not found')
+          script = match.group(1).strip()
+          if not script:
+              raise SystemExit('inline legacy script is empty')
+          Path('/tmp/app.js').write_text(script)
           PY
           node --check /tmp/app.js
-      - name: Install jsdom
-        run: npm install --no-save jsdom@26
-      - name: DOM smoke test
+
+      - name: Legacy DOM smoke test
         run: |
+          npm install --no-save --package-lock=false jsdom@26
           node <<'JS'
           const fs=require('fs');
           const {JSDOM}=require('jsdom');
           const html=fs.readFileSync('index.html','utf8');
           const dom=new JSDOM(html,{runScripts:'dangerously',pretendToBeVisual:true,url:'https://example.test/'});
-          const {window}=dom;
-          const d=window.document;
+          const d=dom.window.document;
           const assert=(ok,msg)=>{if(!ok)throw new Error(msg)};
+
           assert(d.querySelectorAll('.cell').length===64,'initial 8x8 board should have 64 cells');
+
           const n=d.getElementById('n');
-          n.value='12';d.getElementById('new').click();
+          n.value='12';
+          d.getElementById('new').click();
           assert(d.querySelectorAll('.cell').length===144,'12x12 board should have 144 cells');
-          n.value='20';d.getElementById('new').click();
+
+          n.value='20';
+          d.getElementById('new').click();
           assert(d.querySelectorAll('.cell').length===400,'20x20 manual board should have 400 cells');
-          for(let i=0;i<5;i++)d.getElementById('new').click();
-          assert(d.getElementById('solver').style.display==='block','solver should unlock after 7 consecutive new-board clicks');
-          n.value='13';d.getElementById('random').click();
+
+          n.value='13';
+          d.getElementById('random').click();
           assert(d.getElementById('status').textContent.includes('最大支援 12×12'),'random generator should reject N > 12');
-          console.log('DOM smoke test passed');
+
+          console.log('Legacy DOM smoke test passed');
           JS

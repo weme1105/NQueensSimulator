@@ -139,10 +139,21 @@ export class SolverEngine {
 
   private contradiction(): string | null {
     const snap = this.snapshot();
+
+    // Structural queen conflicts must win over derived "no candidates" errors.
+    // Otherwise a duplicate queen in a later column/region can mask the real
+    // contradiction by exhausting candidates in an earlier unit.
     for (let i = 0; i < this.n; i++) {
       if (snap.rowQueens[i] > 1) return `Row ${i + 1} 有多個皇后`;
+    }
+    for (let i = 0; i < this.n; i++) {
       if (snap.colQueens[i] > 1) return `Column ${i + 1} 有多個皇后`;
+    }
+    for (let i = 0; i < this.n; i++) {
       if (snap.regionQueens[i] > 1) return `Region ${i + 1} 有多個皇后`;
+    }
+
+    for (let i = 0; i < this.n; i++) {
       if (!snap.rowQueens[i] && !snap.rowCandidates[i]) return `Row ${i + 1} 沒有候選格`;
       if (!snap.colQueens[i] && !snap.colCandidates[i]) return `Column ${i + 1} 沒有候選格`;
       if (!snap.regionQueens[i] && !snap.regionCandidates[i]) return `Region ${i + 1} 沒有候選格`;
@@ -263,99 +274,93 @@ export class SolverEngine {
         for (const c of this.unit(kind, unit)) if (this.isCandidate(c, snap) && !regionSet.has(c.regionId)) affected.push(c);
       }
       if (!affected.length) return false;
-      found = this.result(rule, `色塊 ${regions.map((i) => i + 1).join(',')} 形成反向 Hall ${size}`, affected, CellState.Excluded);
+      found = this.result(rule, `Regions ${regions.map((i) => i + 1).join(',')} 形成反向 Hall ${size}`, affected, CellState.Excluded);
       return true;
     });
     return found;
   }
 
-  private proof(maxHall: number, rule: SolverRule, minHall = 2): DeductionResult | null {
-    const snap = this.snapshot();
-    const candidates = this.cells.flat().filter((c) => this.isCandidate(c, snap));
-    candidates.sort((a, b) => (snap.rowCandidates[a.row] + snap.colCandidates[a.col] + snap.regionCandidates[a.regionId]) - (snap.rowCandidates[b.row] + snap.colCandidates[b.col] + snap.regionCandidates[b.regionId]));
-    for (const assumed of [CellState.Queen, CellState.Excluded] as const) {
-      for (const cell of candidates) {
-        const clone = new SolverEngine(this.toBoard());
-        clone.cells[cell.row][cell.col].state = assumed;
-        const contradiction = clone.closure(maxHall, minHall);
-        if (!contradiction) continue;
-        const newState = assumed === CellState.Queen ? CellState.Excluded : CellState.Queen;
-        return {
-          rule,
-          label: `反證：假設 ${coord(cell.row, cell.col)} ${assumed === CellState.Queen ? '是皇后' : '是 X'} 會造成「${contradiction}」`,
-          changes: [{ row: cell.row, col: cell.col, newState }],
-          producesQueen: newState === CellState.Queen,
-        };
+  private proof(maxHall: number, rule: SolverRule): DeductionResult | null {
+    const base = this.snapshot();
+    const candidates = this.cells.flat().filter((c) => this.isCandidate(c, base));
+    for (const candidate of candidates) {
+      const clone = new SolverEngine(this.toBoard());
+      clone.cells[candidate.row][candidate.col].state = CellState.Queen;
+      let contradicted = false;
+      for (let i = 0; i < this.n * this.n * 2; i++) {
+        const bad = clone.contradiction();
+        if (bad) { contradicted = true; break; }
+        const deduction = maxHall === 0 ? clone.basic() : clone.basic() || (maxHall >= 2 ? clone.hallTier(2) : null) || (maxHall >= 3 ? clone.hallTier(3) : null) || (maxHall >= 4 ? clone.hallTier(4) : null) || (maxHall >= 5 ? clone.hallTier(5) : null);
+        if (!deduction) break;
+        clone.apply(deduction.changes);
       }
-    }
-    return null;
-  }
-
-  private closure(maxHall: number, minHall: number): string | null {
-    const limit = this.n * this.n * 20;
-    for (let guard = 0; guard < limit; guard++) {
-      const bad = this.contradiction(); if (bad) return bad;
-      let d = this.basic();
-      if (!d && maxHall >= 2) for (let size = minHall; size <= maxHall && !d; size++) d = this.hallTier(size);
-      if (!d) return null;
-      this.apply(d.changes);
+      if (contradicted) {
+        return { rule, label: `反證：假設 ${coord(candidate.row, candidate.col)} 為皇后會導致矛盾，因此排除`, changes: [{ row: candidate.row, col: candidate.col, newState: CellState.Excluded }], producesQueen: false };
+      }
     }
     return null;
   }
 
   countSolutions(limit = 2): number {
-    const n = this.n, assigned = new Uint8Array(n), placedCols = new Int16Array(n); placedCols.fill(-1);
-    let usedCols = 0, usedRegions = 0, count = 0;
-    const valid = (cell: MutableCell) => {
-      if (cell.regionId < 0 || cell.regionId >= n || assigned[cell.row]) return false;
-      if ((usedCols & (1 << cell.col)) || (usedRegions & (1 << cell.regionId))) return false;
-      if (cell.row > 0 && placedCols[cell.row - 1] >= 0 && Math.abs(placedCols[cell.row - 1] - cell.col) <= 1) return false;
-      if (cell.row + 1 < n && placedCols[cell.row + 1] >= 0 && Math.abs(placedCols[cell.row + 1] - cell.col) <= 1) return false;
-      return true;
-    };
-    const choose = (): MutableCell[] | null => {
-      let best: MutableCell[] | null = null;
-      for (let r = 0; r < n; r++) if (!assigned[r]) {
-        const cand = this.cells[r].filter(valid); if (!cand.length) return [];
-        if (!best || cand.length < best.length) best = cand;
-      }
-      for (let c = 0; c < n; c++) if (!(usedCols & (1 << c))) {
-        const cand = this.cols[c].filter(valid); if (!cand.length) return [];
-        if (!best || cand.length < best.length) best = cand;
-      }
-      for (let region = 0; region < n; region++) if (!(usedRegions & (1 << region))) {
-        const cand = this.regions[region].filter(valid); if (!cand.length) return [];
-        if (!best || cand.length < best.length) best = cand;
-      }
-      return best;
-    };
-    const dfs = (depth: number) => {
+    const rows = this.cells.map((row) => row.map((c) => c.state));
+    let count = 0;
+    const search = (row: number) => {
       if (count >= limit) return;
-      if (depth === n) { count++; return; }
-      const candidates = choose(); if (!candidates?.length) return;
-      for (const cell of candidates) {
-        assigned[cell.row] = 1; placedCols[cell.row] = cell.col; usedCols |= 1 << cell.col; usedRegions |= 1 << cell.regionId;
-        dfs(depth + 1);
-        usedRegions &= ~(1 << cell.regionId); usedCols &= ~(1 << cell.col); placedCols[cell.row] = -1; assigned[cell.row] = 0;
-        if (count >= limit) return;
+      if (row === this.n) { count++; return; }
+      const existing = this.cells[row].find((c) => c.state === CellState.Queen);
+      if (existing) { search(row + 1); return; }
+      for (let col = 0; col < this.n && count < limit; col++) {
+        const cell = this.cells[row][col];
+        if (cell.state !== CellState.Empty) continue;
+        if (!this.canPlaceQueen(row, col)) continue;
+        cell.state = CellState.Queen;
+        search(row + 1);
+        cell.state = rows[row][col];
       }
     };
-    dfs(0); return count;
+    search(0);
+    return count;
   }
 
-  private result(rule: SolverRule, label: string, cells: MutableCell[], state: CellState): DeductionResult {
-    return { rule, label, changes: cells.map((c) => ({ row: c.row, col: c.col, newState: state })), producesQueen: state === CellState.Queen };
+  private canPlaceQueen(row: number, col: number): boolean {
+    const cell = this.cells[row][col];
+    if (cell.regionId < 0 || cell.regionId >= this.n) return false;
+    for (let c = 0; c < this.n; c++) if (c !== col && this.cells[row][c].state === CellState.Queen) return false;
+    for (let r = 0; r < this.n; r++) if (r !== row && this.cells[r][col].state === CellState.Queen) return false;
+    for (const other of this.regions[cell.regionId]) if (other !== cell && other.state === CellState.Queen) return false;
+    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
+      if (!dr && !dc) continue;
+      const rr = row + dr, cc = col + dc;
+      if (rr >= 0 && cc >= 0 && rr < this.n && cc < this.n && this.cells[rr][cc].state === CellState.Queen) return false;
+    }
+    return true;
+  }
+
+  private result(rule: SolverRule, label: string, cells: MutableCell[], newState: CellState): DeductionResult {
+    return { rule, label, changes: cells.map((c) => ({ row: c.row, col: c.col, newState })), producesQueen: newState === CellState.Queen };
   }
 }
 
-function bitCount(value: number): number { let n = 0; while (value) { value &= value - 1; n++; } return n; }
-function trailingBit(mask: number): number { return 31 - Math.clz32(mask & -mask); }
-function combinations(items: readonly number[], size: number, visit: (pick: readonly number[]) => boolean): boolean {
-  const pick: number[] = [];
-  const walk = (start: number, left: number): boolean => {
-    if (!left) return visit(pick);
-    for (let i = start; i <= items.length - left; i++) { pick.push(items[i]); if (walk(i + 1, left - 1)) return true; pick.pop(); }
+function trailingBit(mask: number): number {
+  return 31 - Math.clz32(mask & -mask);
+}
+
+function bitCount(value: number): number {
+  let count = 0;
+  for (let v = value >>> 0; v; v &= v - 1) count++;
+  return count;
+}
+
+function combinations(items: number[], size: number, visit: (items: number[]) => boolean): boolean {
+  const chosen: number[] = [];
+  const walk = (start: number): boolean => {
+    if (chosen.length === size) return visit(chosen.slice());
+    for (let i = start; i <= items.length - (size - chosen.length); i++) {
+      chosen.push(items[i]);
+      if (walk(i + 1)) return true;
+      chosen.pop();
+    }
     return false;
   };
-  return walk(0, size);
+  return walk(0);
 }

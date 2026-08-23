@@ -4,11 +4,14 @@ import { installCoordinateDisplayNormalization } from './coordinateDisplay';
 import { installDeductionHighlight } from './deductionHighlight';
 import { installFreeRegionEditor } from './freeRegionEditor';
 import { installPlayGuide } from './playGuide';
+import { queenConflictMessage, immediateExclusions } from './puzzleRules';
 import { installRegionColors } from './regionColors';
 import { installSolverButtonLayout } from './solverButtonLayout';
 import { installUiLayout } from './uiLayout';
+import { installSecretUnlock } from './secretUnlock';
+import { installSettingsPanel } from './settingsPanel';
 import { SolverWorkerClient } from './solver/workerClient';
-import { CellState, type BoardSnapshot, type DeductionResult } from './solver/types';
+import type { BoardSnapshot, DeductionResult } from './solver/types';
 
 type RegionValidation = { ok: boolean; msg?: string };
 type SolutionType = 'unique' | 'multiple';
@@ -37,6 +40,8 @@ installRegionColors(app);
 installSolverButtonLayout();
 installFreeRegionEditor(app);
 installUiLayout(app);
+installSettingsPanel(app);
+installSecretUnlock();
 const deductionHighlight = installDeductionHighlight();
 
 const worker = new SolverWorkerClient();
@@ -45,35 +50,6 @@ const autoButton = document.querySelector<HTMLButtonElement>('#autoQueen');
 const playButton = document.querySelector<HTMLButtonElement>('#play');
 const randomButton = document.querySelector<HTMLButtonElement>('#random');
 let validationSequence = 0;
-
-function queenConflictMessage(board: BoardSnapshot): string | null {
-  const queens = board.cells.filter((cell) => cell.state === CellState.Queen);
-  for (let i = 0; i < queens.length; i++) for (let j = i + 1; j < queens.length; j++) {
-    const a = queens[i], b = queens[j];
-    if (a.row === b.row) return `矛盾：Row ${a.row + 1} 有多個皇后。請先修正皇后位置。`;
-    if (a.col === b.col) return `矛盾：Column ${a.col + 1} 有多個皇后。請先修正皇后位置。`;
-    if (a.regionId >= 0 && a.regionId === b.regionId) return `矛盾：Region ${a.regionId + 1} 有多個皇后。請先修正皇后位置。`;
-    if (Math.abs(a.row - b.row) <= 1 && Math.abs(a.col - b.col) <= 1) return `矛盾：皇后 (${a.col + 1},${a.row + 1}) 與 (${b.col + 1},${b.row + 1}) 相鄰。請先修正皇后位置。`;
-  }
-  return null;
-}
-
-function immediateExclusions(board: BoardSnapshot): DeductionResult | null {
-  const queens = board.cells.filter((cell) => cell.state === CellState.Queen);
-  if (!queens.length) return null;
-  const changes: DeductionResult['changes'] = [];
-  for (const cell of board.cells) {
-    if (cell.state !== CellState.Empty) continue;
-    const blocked = queens.some((queen) =>
-      cell.row === queen.row || cell.col === queen.col ||
-      (cell.regionId >= 0 && cell.regionId === queen.regionId) ||
-      (Math.abs(cell.row - queen.row) <= 1 && Math.abs(cell.col - queen.col) <= 1),
-    );
-    if (blocked) changes.push({ row: cell.row, col: cell.col, newState: CellState.Excluded });
-  }
-  if (!changes.length) return null;
-  return { rule: 'basic', label: `優先排除 ${changes.length} 個與既有皇后衝突的格子`, changes, producesQueen: false };
-}
 
 function applyAndHighlight(result: DeductionResult, source: 'step' | 'auto'): void {
   app.applyDeduction(result, source);
@@ -90,8 +66,10 @@ async function validatePuzzle(enterPlay = false): Promise<void> {
     if (token !== validationSequence) return;
     if (count === 0) { app.showStatus('此色塊配置無解，請調整色塊。', 'bad'); return; }
     const solutionType: SolutionType = count === 1 ? 'unique' : 'multiple';
-    if (enterPlay) app.activatePlay(solutionType);
-    else if (solutionType === 'unique') app.showStatus('✓ 題目驗證通過：唯一解。', 'ok');
+    if (enterPlay) {
+      app.activatePlay(solutionType);
+      if (playButton) playButton.textContent = '離開推演模式';
+    } else if (solutionType === 'unique') app.showStatus('✓ 題目驗證通過：唯一解。', 'ok');
     else app.showStatus('△ 題目可解，但存在多組解，不是唯一解。', 'warn');
   } catch (error) {
     if (token !== validationSequence) return;

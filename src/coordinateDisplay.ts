@@ -1,4 +1,9 @@
+import { installSettingsPanel } from './settingsPanel';
+
 export function installCoordinateDisplayNormalization(): void {
+  const settingsBridge = (window as Window & { nqApp?: { isPlayMode(): boolean } }).nqApp;
+  if (settingsBridge) installSettingsPanel(settingsBridge);
+
   const targets = [
     document.querySelector<HTMLElement>('#history'),
     document.querySelector<HTMLElement>('#status'),
