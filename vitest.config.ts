@@ -14,6 +14,7 @@ export default defineConfig({
         'src/solver/types.ts',
         'src/puzzleRules.ts',
         'src/regionEditRules.ts',
+        'src/queenCorrectnessRules.ts',
         'src/playPointerGuard.ts',
       ],
       thresholds: {
