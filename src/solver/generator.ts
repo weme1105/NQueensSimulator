@@ -1,4 +1,4 @@
-import { SolverEngine } from './engine';
+import { countSolutionsBitmask } from './solutionCounter';
 import { CellState, type BoardSnapshot } from './types';
 
 export interface GeneratedPuzzle {
@@ -18,8 +18,8 @@ export interface GeneratedPuzzle {
  * 4. Reject that region assignment if the forced solution exists. Accepted growth keeps
  *    the known solution unique by construction.
  *
- * This changes generation from random-partition + reject to incremental constraint-guided
- * construction, which is substantially cheaper for 11x11 and 12x12 boards.
+ * All solution checks are delegated to the shared row/column/region bitmask counter so
+ * generator validation, gameplay validation, and queen-correctness checks cannot drift.
  */
 export function generateUniquePuzzle(size: number, maxAttempts = 80): GeneratedPuzzle | null {
   if (size < 4 || size > 12) throw new Error('隨機唯一題目只支援 4×4 到 12×12。');
@@ -33,7 +33,7 @@ export function generateUniquePuzzle(size: number, maxAttempts = 80): GeneratedP
 
     // Safety verification only once at the end. The construction itself preserves
     // uniqueness incrementally, so this is not part of the hot growth loop.
-    if (new SolverEngine(board).countSolutions(2) === 1) return { board, attempts: attempt };
+    if (countSolutionsBitmask(board, 2) === 1) return { board, attempts: attempt };
   }
   return null;
 }
@@ -110,8 +110,6 @@ function buildUniqueRegions(size: number, queens: readonly number[]): BoardSnaps
     if (!options.length) return null;
     options.sort((a, b) => a.score - b.score);
 
-    // Prefer compact/balanced growth, but inspect a wider low-cost window so a
-    // locally attractive assignment cannot easily trap the remaining frontier.
     const windowSize = Math.min(options.length, Math.max(18, size * 4));
     let accepted: GrowthOption | null = null;
 
@@ -119,36 +117,18 @@ function buildUniqueRegions(size: number, queens: readonly number[]): BoardSnaps
       const option = options[i];
       regions[option.row][option.col] = option.region;
 
-      // Before this assignment the puzzle has exactly one solution. Therefore a
-      // new second solution can only exist if it uses this newly available cell.
-      const createsAlternative = canCompleteWithForcedQueen(
-        regions,
-        size,
-        option.row,
-        option.col,
-        option.region,
-      );
-
-      if (!createsAlternative) {
+      if (!canCompleteWithForcedQueen(regions, size, option.row, option.col)) {
         accepted = option;
         break;
       }
       regions[option.row][option.col] = -1;
     }
 
-    // If the cheap window is blocked, scan the rest before abandoning this seed.
     if (!accepted) {
       for (let i = windowSize; i < options.length; i++) {
         const option = options[i];
         regions[option.row][option.col] = option.region;
-        const createsAlternative = canCompleteWithForcedQueen(
-          regions,
-          size,
-          option.row,
-          option.col,
-          option.region,
-        );
-        if (!createsAlternative) {
+        if (!canCompleteWithForcedQueen(regions, size, option.row, option.col)) {
           accepted = option;
           break;
         }
@@ -168,90 +148,34 @@ function buildUniqueRegions(size: number, queens: readonly number[]): BoardSnaps
 }
 
 /**
- * Search for any complete solution containing the newly-added cell as a queen.
- * Finding one means the assignment creates a second solution and must be rejected.
- * This is much cheaper than countSolutions(2), because the new cell is forced.
+ * Finding any complete solution containing the newly-added cell means that region
+ * assignment creates an alternative solution. Force the cell as a given queen and
+ * delegate the search to the shared bitmask counter with limit=1.
  */
 function canCompleteWithForcedQueen(
   regions: readonly Int16Array[],
   size: number,
   forcedRow: number,
   forcedCol: number,
-  forcedRegion: number,
 ): boolean {
-  const assignedRows = new Uint8Array(size);
-  const placedCols = new Int16Array(size);
-  placedCols.fill(-1);
-
-  assignedRows[forcedRow] = 1;
-  placedCols[forcedRow] = forcedCol;
-  let usedCols = 1 << forcedCol;
-  let usedRegions = 1 << forcedRegion;
-
-  type Candidate = { row: number; col: number; region: number };
-
-  const valid = (row: number, col: number, region: number): boolean => {
-    if (region < 0 || assignedRows[row]) return false;
-    if (usedCols & (1 << col)) return false;
-    if (usedRegions & (1 << region)) return false;
-    if (row > 0 && placedCols[row - 1] >= 0 && Math.abs(placedCols[row - 1] - col) <= 1) return false;
-    if (row + 1 < size && placedCols[row + 1] >= 0 && Math.abs(placedCols[row + 1] - col) <= 1) return false;
-    return true;
-  };
-
-  const candidatesForRow = (row: number): Candidate[] => {
-    const result: Candidate[] = [];
-    for (let col = 0; col < size; col++) {
-      const region = regions[row][col];
-      if (valid(row, col, region)) result.push({ row, col, region });
-    }
-    return result;
-  };
-
-  const chooseRow = (): Candidate[] | null => {
-    let best: Candidate[] | null = null;
-    for (let row = 0; row < size; row++) {
-      if (assignedRows[row]) continue;
-      const candidates = candidatesForRow(row);
-      if (!candidates.length) return [];
-      if (!best || candidates.length < best.length) {
-        best = candidates;
-        if (best.length === 1) break;
-      }
-    }
-    return best;
-  };
-
-  const dfs = (depth: number): boolean => {
-    if (depth === size) return true;
-    const candidates = chooseRow();
-    if (!candidates?.length) return false;
-
-    // Low branching first. A little randomization avoids generating identical
-    // shapes without changing correctness.
-    for (const cell of candidates) {
-      assignedRows[cell.row] = 1;
-      placedCols[cell.row] = cell.col;
-      usedCols |= 1 << cell.col;
-      usedRegions |= 1 << cell.region;
-
-      if (dfs(depth + 1)) return true;
-
-      usedRegions &= ~(1 << cell.region);
-      usedCols &= ~(1 << cell.col);
-      placedCols[cell.row] = -1;
-      assignedRows[cell.row] = 0;
-    }
-    return false;
-  };
-
-  return dfs(1);
+  const board = boardFromRegions(regions, size, forcedRow, forcedCol);
+  return countSolutionsBitmask(board, 1) > 0;
 }
 
-function boardFromRegions(regions: readonly Int16Array[], size: number): BoardSnapshot {
+function boardFromRegions(
+  regions: readonly Int16Array[],
+  size: number,
+  forcedRow = -1,
+  forcedCol = -1,
+): BoardSnapshot {
   const cells = [];
   for (let row = 0; row < size; row++) for (let col = 0; col < size; col++) {
-    cells.push({ row, col, regionId: regions[row][col], state: CellState.Empty });
+    cells.push({
+      row,
+      col,
+      regionId: regions[row][col],
+      state: row === forcedRow && col === forcedCol ? CellState.Queen : CellState.Empty,
+    });
   }
   return { size, cells };
 }

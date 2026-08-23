@@ -1,4 +1,5 @@
 import { AUTO_PIPELINE, STEP_PIPELINE } from './pipeline';
+import { countSolutionsBitmask } from './solutionCounter';
 import { CellState, type BoardSnapshot, type CellChange, type DeductionResult, type SolverRule } from './types';
 
 type MutableCell = { row: number; col: number; regionId: number; state: CellState };
@@ -302,38 +303,7 @@ export class SolverEngine {
   }
 
   countSolutions(limit = 2): number {
-    const rows = this.cells.map((row) => row.map((c) => c.state));
-    let count = 0;
-    const search = (row: number) => {
-      if (count >= limit) return;
-      if (row === this.n) { count++; return; }
-      const existing = this.cells[row].find((c) => c.state === CellState.Queen);
-      if (existing) { search(row + 1); return; }
-      for (let col = 0; col < this.n && count < limit; col++) {
-        const cell = this.cells[row][col];
-        if (cell.state !== CellState.Empty) continue;
-        if (!this.canPlaceQueen(row, col)) continue;
-        cell.state = CellState.Queen;
-        search(row + 1);
-        cell.state = rows[row][col];
-      }
-    };
-    search(0);
-    return count;
-  }
-
-  private canPlaceQueen(row: number, col: number): boolean {
-    const cell = this.cells[row][col];
-    if (cell.regionId < 0 || cell.regionId >= this.n) return false;
-    for (let c = 0; c < this.n; c++) if (c !== col && this.cells[row][c].state === CellState.Queen) return false;
-    for (let r = 0; r < this.n; r++) if (r !== row && this.cells[r][col].state === CellState.Queen) return false;
-    for (const other of this.regions[cell.regionId]) if (other !== cell && other.state === CellState.Queen) return false;
-    for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
-      if (!dr && !dc) continue;
-      const rr = row + dr, cc = col + dc;
-      if (rr >= 0 && cc >= 0 && rr < this.n && cc < this.n && this.cells[rr][cc].state === CellState.Queen) return false;
-    }
-    return true;
+    return countSolutionsBitmask(this.toBoard(), limit);
   }
 
   private result(rule: SolverRule, label: string, cells: MutableCell[], newState: CellState): DeductionResult {

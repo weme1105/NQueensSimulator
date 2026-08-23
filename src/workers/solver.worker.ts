@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 import { SolverEngine } from '../solver/engine';
 import { generateUniquePuzzle } from '../solver/generator';
+import { countSolutionsBitmask } from '../solver/solutionCounter';
 import type { CellChange, DeductionResult, WorkerRequest, WorkerResponse } from '../solver/types';
 
 declare const self: DedicatedWorkerGlobalScope;
@@ -37,8 +38,7 @@ self.onmessage = (event: MessageEvent<WorkerRequest>) => {
   const request = event.data;
   try {
     if (request.type === 'COUNT_SOLUTIONS') {
-      const engine = new SolverEngine(request.board);
-      post({ id: request.id, type: 'SOLUTION_COUNT', count: engine.countSolutions(request.limit) });
+      post({ id: request.id, type: 'SOLUTION_COUNT', count: countSolutionsBitmask(request.board, request.limit) });
       return;
     }
 

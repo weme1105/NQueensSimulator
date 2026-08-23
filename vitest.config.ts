@@ -12,8 +12,11 @@ export default defineConfig({
         'src/solver/generator.ts',
         'src/solver/pipeline.ts',
         'src/solver/types.ts',
+        'src/solver/solutionCounter.ts',
+        'src/solver/puzzleDefinition.ts',
         'src/puzzleRules.ts',
         'src/regionEditRules.ts',
+        'src/queenCorrectnessRules.ts',
         'src/playPointerGuard.ts',
       ],
       thresholds: {

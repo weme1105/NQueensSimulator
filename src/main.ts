@@ -5,6 +5,7 @@ import { installDeductionHighlight } from './deductionHighlight';
 import { installFreeRegionEditor } from './freeRegionEditor';
 import { installPlayGuide } from './playGuide';
 import { queenConflictMessage, immediateExclusions } from './puzzleRules';
+import { installQueenCorrectness } from './queenCorrectness';
 import { installRegionColors } from './regionColors';
 import { installSolverButtonLayout } from './solverButtonLayout';
 import { installUiLayout } from './uiLayout';
@@ -42,6 +43,7 @@ installFreeRegionEditor(app);
 installUiLayout(app);
 installSettingsPanel(app);
 installSecretUnlock();
+installQueenCorrectness(app);
 const deductionHighlight = installDeductionHighlight();
 
 const worker = new SolverWorkerClient();
