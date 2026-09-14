@@ -41,10 +41,6 @@ export function generateColorFirstPuzzle(
   return null;
 }
 
-/**
- * Returns the first complete solution. The caller has already established
- * uniqueness, so this is only a reconstruction pass for the saved answer.
- */
 export function findUniqueSolution(board: BoardSnapshot): number[] | null {
   const size = board.size;
   const cells = Array.from({ length: size }, () =>
@@ -78,7 +74,7 @@ function randomConnectedPartition(size: number): number[] | null {
   const total = size * size;
   const regions = Array<number>(total).fill(-1);
   const regionSizes = Array<number>(size).fill(1);
-  const seeds = shuffle(Array.from({ length: total }, (_, index) => index)).slice(0, size);
+  const seeds = chooseSeparatedSeeds(size);
   const frontier = new Set<number>();
 
   for (let region = 0; region < size; region++) regions[seeds[region]] = region;
@@ -87,6 +83,8 @@ function randomConnectedPartition(size: number): number[] | null {
   let remaining = total - size;
   while (remaining > 0) {
     const options: Array<{ cell: number; region: number; score: number }> = [];
+    const targetMin = Math.max(1, Math.floor(size * 0.45));
+    const targetMax = Math.min(size * 2 + 2, Math.ceil(size * 1.8));
 
     for (const cell of frontier) {
       if (regions[cell] >= 0) continue;
@@ -96,16 +94,18 @@ function randomConnectedPartition(size: number): number[] | null {
         if (region >= 0) adjacent.add(region);
       }
       for (const region of adjacent) {
-        // Mild balancing prevents one seed from swallowing most of the board,
-        // while the random jitter keeps the bank diverse.
-        const score = regionSizes[region] * 2 + Math.random() * 6;
+        const current = regionSizes[region];
+        if (current >= targetMax && remaining > size) continue;
+        const balance = current < targetMin ? -8 : current >= targetMax ? 8 : 0;
+        const edgePenalty = boundaryExposure(cell, size, regions, region) * 0.25;
+        const score = current * 3 + balance + edgePenalty + Math.random() * 3;
         options.push({ cell, region, score });
       }
     }
 
     if (!options.length) return null;
     options.sort((a, b) => a.score - b.score);
-    const pool = options.slice(0, Math.min(options.length, Math.max(12, size * 3)));
+    const pool = options.slice(0, Math.min(options.length, Math.max(16, size * 4)));
     const choice = pool[Math.floor(Math.random() * pool.length)];
 
     regions[choice.cell] = choice.region;
@@ -115,9 +115,32 @@ function randomConnectedPartition(size: number): number[] | null {
     remaining--;
   }
 
-  // Canonicalize region IDs so identical partitions reached through different
-  // seed labels are treated as the same puzzle during bank de-duplication.
   return canonicalize(regions);
+}
+
+/** Prefer seeds with a little spacing so early growth does not create thin,
+ * highly unbalanced regions. This does not impose any solution information. */
+function chooseSeparatedSeeds(size: number): number[] {
+  const cells = shuffle(Array.from({ length: size * size }, (_, index) => index));
+  const selected: number[] = [];
+  const minDistance = Math.max(1, Math.floor(size / 3));
+  for (const cell of cells) {
+    const row = Math.floor(cell / size), col = cell % size;
+    if (selected.every((other) => {
+      const otherRow = Math.floor(other / size), otherCol = other % size;
+      return Math.abs(row - otherRow) + Math.abs(col - otherCol) >= minDistance;
+    })) selected.push(cell);
+    if (selected.length === size) return selected;
+  }
+  return cells.slice(0, size);
+}
+
+function boundaryExposure(cell: number, size: number, regions: readonly number[], region: number): number {
+  let exposure = 0;
+  for (const neighbor of orthogonalNeighbors(cell, size)) {
+    if (regions[neighbor] >= 0 && regions[neighbor] !== region) exposure++;
+  }
+  return exposure;
 }
 
 function addFrontier(cell: number, size: number, regions: readonly number[], frontier: Set<number>): void {
