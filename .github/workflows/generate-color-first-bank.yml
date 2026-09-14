@@ -12,8 +12,6 @@ on:
 permissions:
   contents: write
 
-authorizations: {}
-
 jobs:
   generate:
     strategy:
