@@ -18,7 +18,7 @@ describe('puzzleFingerprint', () => {
     const result = fingerprintPuzzle([0, 0, 1, 0, 2, 1, 2, 2, 1], 3, [2, 0, 2]);
     expect(result.region).toBe('0,0,1,0,2,1,2,2,1');
     expect(result.solution).toBe('2,0,2');
-    expect(result.regionSizeHistogram).toBe('2,2,5');
+    expect(result.regionSizeHistogram).toBe('3,3,3');
     expect(result.rowTransitions).toBe('1,2,1');
     expect(result.columnTransitions).toBe('1,2,1');
   });
