@@ -1,6 +1,5 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { generateColorFirstPuzzle } from '../src/solver/colorFirstGenerator';
-import type { BoardSnapshot } from '../src/solver/types';
 
 const sizes = parseSizes(process.env.SIZES ?? '6,7,8,9,10');
 const targetPerSize = positiveInt(process.env.TARGET_PER_SIZE, 50);
@@ -91,7 +90,3 @@ function parseSizes(value: string): number[] {
     .filter((size) => Number.isInteger(size) && size >= 4 && size <= 12);
   return [...new Set(parsed.length ? parsed : [6, 7, 8, 9, 10])];
 }
-
-// Keep the import type visible to TypeScript's strict module analysis in Node's
-// strip-types execution mode without changing the generated JSON shape.
-void (null as unknown as BoardSnapshot | null);
