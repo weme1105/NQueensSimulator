@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { analyzeSolutionSearch, type SolverTelemetry } from '../src/solver/solutionTelemetry';
+import { fingerprintPuzzle, type PuzzleFingerprint } from '../src/solver/puzzleFingerprint';
 import { generateColorFirstPuzzle } from '../src/solver/colorFirstGenerator';
 
 const sizes = parseSizes(process.env.SIZES ?? '6,7,8,9,10');
@@ -13,10 +14,11 @@ interface BankEntry {
   regions: number[];
   solution: number[];
   telemetry: SolverTelemetry;
+  fingerprint: PuzzleFingerprint;
 }
 
 interface BankFile {
-  version: 2;
+  version: 3;
   mode: 'basic-color-first';
   size: number;
   generatedAt: string;
@@ -57,12 +59,15 @@ for (const size of sizes) {
     if (seen.has(signature)) continue;
     seen.add(signature);
 
+    const telemetry = analyzeSolutionSearch(result.board);
+    const fingerprint = fingerprintPuzzle(regions, size, result.solution);
     entries.push({
       id: `${size}x${size}-${String(entries.length + 1).padStart(4, '0')}`,
       size,
       regions,
       solution: result.solution,
-      telemetry: analyzeSolutionSearch(result.board),
+      telemetry,
+      fingerprint,
     });
 
     if (entries.length % 10 === 0 || entries.length === targetPerSize) {
@@ -72,7 +77,7 @@ for (const size of sizes) {
   }
 
   const bank: BankFile = {
-    version: 2,
+    version: 3,
     mode: 'basic-color-first',
     size,
     generatedAt: new Date().toISOString(),
