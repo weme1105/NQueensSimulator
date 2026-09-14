@@ -117,7 +117,7 @@ function randomConnectedPartition(size: number): number[] | null {
 
   // Canonicalize region IDs so identical partitions reached through different
   // seed labels are treated as the same puzzle during bank de-duplication.
-  return canonicalize(regions, size);
+  return canonicalize(regions);
 }
 
 function addFrontier(cell: number, size: number, regions: readonly number[], frontier: Set<number>): void {
@@ -137,7 +137,7 @@ function orthogonalNeighbors(cell: number, size: number): number[] {
   return result;
 }
 
-function canonicalize(regions: readonly number[], size: number): number[] {
+function canonicalize(regions: readonly number[]): number[] {
   const mapping = new Map<number, number>();
   const result = Array<number>(regions.length);
   let next = 0;
