@@ -2,9 +2,10 @@ name: Generate Color-First Puzzle Bank
 
 on:
   push:
-    branches: [feature/color-first-puzzle-bank]
+    branches: [feature/color-first-puzzle-bank, feature/color-first-puzzle-bank-v2]
     paths:
       - 'src/solver/colorFirstGenerator.ts'
+      - 'src/solver/solutionTelemetry.ts'
       - 'scripts/generateColorFirstBank.ts'
       - '.github/workflows/generate-color-first-bank.yml'
   workflow_dispatch:
@@ -45,7 +46,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: feature/color-first-puzzle-bank
+          ref: ${{ github.ref_name }}
           fetch-depth: 0
       - uses: actions/download-artifact@v4
         with:
@@ -62,4 +63,4 @@ jobs:
             exit 0
           fi
           git commit -m 'data: generate color-first basic puzzle bank 6x6-10x10'
-          git push origin HEAD:feature/color-first-puzzle-bank
+          git push origin HEAD:${{ github.ref_name }}
