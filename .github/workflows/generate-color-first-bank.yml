@@ -1,0 +1,67 @@
+name: Generate Color-First Puzzle Bank
+
+on:
+  push:
+    branches: [feature/color-first-puzzle-bank]
+    paths:
+      - 'src/solver/colorFirstGenerator.ts'
+      - 'scripts/generateColorFirstBank.ts'
+      - '.github/workflows/generate-color-first-bank.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+authorizations: {}
+
+jobs:
+  generate:
+    strategy:
+      fail-fast: false
+      matrix:
+        size: [6, 7, 8, 9, 10]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Generate bank
+        env:
+          SIZES: ${{ matrix.size }}
+          TARGET_PER_SIZE: '50'
+          MAX_ATTEMPTS: '200000'
+        run: npx --yes tsx scripts/generateColorFirstBank.ts
+      - uses: actions/upload-artifact@v4
+        with:
+          name: color-first-bank-${{ matrix.size }}
+          path: data/generated/basic/puzzle-bank-${{ matrix.size }}.json
+          if-no-files-found: error
+
+  commit-bank:
+    needs: generate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/color-first-puzzle-bank
+          fetch-depth: 0
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: color-first-bank-*
+          path: data/generated/basic
+          merge-multiple: true
+      - name: Commit generated bank
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/generated/basic
+          if git diff --cached --quiet; then
+            echo 'No generated bank changes.'
+            exit 0
+          fi
+          git commit -m 'data: generate color-first basic puzzle bank 6x6-10x10'
+          git push origin HEAD:feature/color-first-puzzle-bank
