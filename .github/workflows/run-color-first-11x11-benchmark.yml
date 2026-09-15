@@ -1,6 +1,18 @@
 name: Run Color-First 11x11 Benchmark
 
 on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: Number of accepted 11x11 puzzles to generate
+        required: true
+        default: '10'
+        type: string
+      max_attempts:
+        description: Maximum generation attempts
+        required: true
+        default: '200000'
+        type: string
   push:
     branches:
       - benchmark/color-first-11x11
@@ -10,9 +22,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      TARGET_PER_SIZE: '10'
+      TARGET_PER_SIZE: ${{ inputs.target || '10' }}
       SIZES: '11'
-      MAX_ATTEMPTS: '200000'
+      MAX_ATTEMPTS: ${{ inputs.max_attempts || '200000' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -23,7 +35,7 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Generate 11x11 benchmark bank
+      - name: Generate 11x11 benchmark
         run: |
           start=$(date +%s%3N)
           npx --yes tsx scripts/generateColorFirstBank.ts
